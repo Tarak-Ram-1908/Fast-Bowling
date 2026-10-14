@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Delivery Stride — front-leg analysis from one video</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css?v={{ v }}">
+</head><body>
+
+<header class="top"><div class="wrap">
+  <span class="mark">Delivery <b>Stride</b></span>
+</div></header>
+
+<section class="hero"><div class="wrap">
+  <h1>Where your pace<br>is going</h1>
+  <p class="lede">Elite fast bowling has been measured in laboratories for
+    decades, with eighteen cameras and markers taped to the body. Film one
+    delivery from the side on a phone and this returns the same twelve
+    measurements, set against the elite reference values.</p>
+
+</div></section>
+
+<section class="shoot"><div class="wrap">
+  <h2>Filming the delivery</h2>
+  <p>The measurement is only as good as the angle you shoot from. Five things
+     matter; the rest does not.</p>
+  <ul class="checks">
+    <li><b>Stand square to the bowler</b><span>Side on, level with the crease,
+      about 8–10 m away. Not behind, not at an angle.</span></li>
+    <li><b>Both feet and the head in frame</b><span>Through the whole delivery
+      stride. If the feet leave the frame the stride cannot be measured.</span></li>
+    <li><b>120 frames per second</b><span>Slow-motion mode on any recent phone.
+      At 30 fps the foot contacts fall between frames.</span></li>
+    <li><b>Hold the phone still</b><span>Brace it or use a tripod. Panning
+      moves the background the model uses for scale.</span></li>
+    <li><b>One delivery per clip</b><span>From run-up to follow-through. Three
+      to five seconds is plenty.</span></li>
+  </ul>
+</div></section>
+
+<section class="upload"><div class="wrap">
+  <h2>Analyse a delivery</h2>
+  {% if not model_ready %}
+  <div class="warn"><b>The model has not been trained yet.</b>
+    Run <code>py -3.13 train_production.py feat_noab_win.csv</code> first.</div>
+  {% endif %}
+  <form id="f" class="drop">
+    <input type="file" name="video" id="video" accept="video/mp4,video/quicktime,.mp4,.mov,.m4v">
+    <button type="submit" id="go" {% if not model_ready %}disabled{% endif %}>Measure it</button>
+  </form>
+  <div class="bar" id="bar"><i id="fill"></i></div>
+  <p class="stage" id="stage"></p>
+  <p class="err" id="err"></p>
+</div></section>
+
+<script>
+const f=document.getElementById('f'), go=document.getElementById('go'),
+      bar=document.getElementById('bar'), fill=document.getElementById('fill'),
+      stage=document.getElementById('stage'), err=document.getElementById('err');
+f.addEventListener('dragover',e=>{e.preventDefault();f.classList.add('hot')});
+f.addEventListener('dragleave',()=>f.classList.remove('hot'));
+f.addEventListener('drop',e=>{e.preventDefault();f.classList.remove('hot');
+  document.getElementById('video').files=e.dataTransfer.files;});
+
+f.addEventListener('submit', async e=>{
+  e.preventDefault(); err.textContent='';
+  const file=document.getElementById('video').files[0];
+  if(!file){err.textContent='Choose a video first.';return;}
+  go.disabled=true; go.textContent='Working'; bar.classList.add('on');
+  const fd=new FormData(); fd.append('video',file);
+  let r;
+  try{ r=await (await fetch('/analyse',{method:'POST',body:fd})).json(); }
+  catch(_){ return fail('Upload failed. Check the file and try again.'); }
+  if(r.error) return fail(r.error);
+  poll(r.job);
+});
+
+function fail(m){err.textContent=m;go.disabled=false;go.textContent='Measure it';
+  bar.classList.remove('on');stage.textContent='';}
+
+async function poll(id){
+  const t=setInterval(async()=>{
+    const p=await (await fetch('/progress/'+id)).json();
+    fill.style.width=Math.max(p.progress,2)+'%';
+    stage.textContent=p.stage||'';
+    if(p.state==='done'){clearInterval(t);location='/report/'+id;}
+    if(p.state==='failed'){clearInterval(t);fail(p.error||'Analysis failed.');}
+  },700);
+}
+</script>
+</body></html>

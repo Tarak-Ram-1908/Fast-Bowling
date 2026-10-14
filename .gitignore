@@ -1,0 +1,12 @@
+videos/
+Papers/
+web/uploads/*
+!web/uploads/.gitkeep
+__pycache__/
+*.pyc
+*.bak
+keypoints.csv
+features.csv
+feat_noab*.csv
+frame_labels.csv
+predictions.csv

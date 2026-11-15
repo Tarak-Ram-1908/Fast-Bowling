@@ -1,13 +1,3 @@
----
-title: Delivery Stride
-emoji: 🏏
-colorFrom: green
-colorTo: yellow
-sdk: docker
-app_port: 7860
-pinned: false
----
-
 # Delivery Stride
 
 Fast bowling technique measured from a single side-on phone video. Upload one
@@ -22,7 +12,7 @@ MediaPipe gives 33 body landmarks per frame. Sixteen per-frame features are
 computed from those, then stacked across an eleven-frame window so the model can
 see motion rather than only position. A random forest labels each frame with
 the phase of the delivery it belongs to, the phase blocks give the three event
-instants — back foot contact, front foot contact, ball release — and the twelve
+instants â€” back foot contact, front foot contact, ball release â€” and the twelve
 measurements are geometry at those frames.
 
 ## Accuracy
@@ -42,13 +32,13 @@ Mean absolute timing error is 0.76 frames (6.3 ms) for ball release and 1.53
 frames (12.7 ms) for front foot contact.
 
 Two measurements reproduce laboratory values almost exactly: plant angle
-36.6° against the elite 36.3 ± 3.9, and front knee at foot contact 167.8°
-against 164.1 ± 6.1.
+36.6Â° against the elite 36.3 Â± 3.9, and front knee at foot contact 167.8Â°
+against 164.1 Â± 6.1.
 
 ## What it does not do
 
-It does not assess whether the bowling action is legal — elbow extension past
-the permitted 15° cannot be judged from one side-on view. It says nothing about
+It does not assess whether the bowling action is legal â€” elbow extension past
+the permitted 15Â° cannot be judged from one side-on view. It says nothing about
 injury risk: shoulder counter-rotation, the strongest published link between
 technique and lower-back injury, is a transverse-plane measurement needing a
 second camera behind the bowler.

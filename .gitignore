@@ -17,11 +17,3 @@ cloudflared.exe
 predictions_all.csv
 pred_nostack.csv
 
-# per-bowler data - identifiable, pending consent
-labels.csv
-legality.csv
-bowlers.csv
-measurements.csv
-technique.csv
-events_*.csv
-ev_nostack.csv

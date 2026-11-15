@@ -1,0 +1,157 @@
+
+======================================================================
+1. DATASET
+======================================================================
+  clips marked      304
+  usable            284
+  bowlers           25
+  frame rate        282 clips at 120 fps
+                    22 clips at 115.6-119.6 fps (capture drift, worst 3.7% off)
+  legal deliveries  262 of 284  (92.3%)
+  labelled frames   35466
+
+  phase balance
+    Run-up                   7719   21.8%
+    Back-foot contact        6571   18.5%
+    Front-foot contact       4674   13.2%
+    Follow-through           9171   25.9%
+    None                     7331   20.7%
+
+======================================================================
+2. EVENT DETECTION ACCURACY
+======================================================================
+
+  all rates below are out of 268 deliveries, including the ones
+  where no block was found -- a model that gives up is not rewarded
+
+  Ball release  (forest)
+    detected          268/268  (100.0%)
+    mean |error|      0.76 frames (6.3 ms)   [of those detected]
+    within  1          86.6%
+    within  2          95.5%
+    within  3          98.5%
+    within  5          99.6%
+
+  Front-foot contact  (forest)
+    detected          268/268  (100.0%)
+    mean |error|      1.53 frames (12.7 ms)   [of those detected]
+    within  1          59.3%
+    within  2          78.0%
+    within  3          91.8%
+    within  5          98.9%
+
+  Back-foot contact  (forest)
+    detected          267/268  (99.6%)
+    mean |error|      3.54 frames (29.5 ms)   [of those detected]
+    within  1          25.7%
+    within  2          44.4%
+    within  3          59.0%
+    within  5          78.7%
+
+======================================================================
+3. MODEL COMPARISON
+======================================================================
+
+  per-frame, 27840 frames, out-of-fold
+
+  model         accuracy  macro F1
+  bilstm           0.915     0.909
+  extratrees       0.847     0.827
+  forest           0.852     0.831
+  hgb              0.863     0.844
+  logreg           0.816     0.806
+  mlp              0.843     0.822
+  tcn              0.833     0.820
+
+  per-bowler accuracy (forest): mean 0.851  worst 0.730 (Jaswanth)
+
+  within 3 frames, by model
+                              bilstm  extratrees      forest         hgb      logreg         mlp         tcn
+  Ball release                 97.4%       98.5%       98.5%       98.5%       88.1%       96.3%       88.4%
+  Front-foot contact           72.8%       84.7%       91.8%       91.0%       80.6%       83.2%       82.1%
+  Back-foot contact            79.9%       58.2%       59.0%       59.0%       53.4%       59.0%       49.6%
+
+======================================================================
+4. BIOMECHANICAL MEASUREMENTS vs WORTHINGTON (2010)
+======================================================================
+  262 deliveries, 23 bowlers
+
+  measurement                ours (mean+-sd)           elite      z in +-1sd
+  Front knee at FFC             167.8 ±8.4      164.1 ±6.1    +0.60      47%
+  Front knee at release         143.4 ±17.6     167.3 ±18.8   -1.27      33%
+  Knee flexion                   27.5 ±15.0      17.5 ±11.2   +0.89      38%
+  Knee extension                  3.1 ±4.5       11.9 ±7.4    -1.19      24%
+  Plant angle                    36.6 ±4.6       36.3 ±3.9    +0.07      61%
+  Foot strike                     7.1 ±13.7      -8.2 ±13.2   +1.16      37%
+  Trunk lean at BFC               3.4 ±5.7        9.0 ±5.2    -1.09      47%
+  Stride (% height)              67.3 ±8.8       78.5 ±7.2    -1.56      32%
+  Release height (% height)      108.3 ±10.2     112.8 ±4.1    -1.09      23%
+
+  per-bowler mean z (sorted; a column of one colour means the
+  difference is the whole group, not a few individuals)
+                 Front kne Front kne Knee flex Knee exte Plant ang Foot stri Trunk lea Stride (% Release h
+  Anirudh            -2.95     -2.18     +0.49     -1.18     -2.47     +0.16     -2.93     -1.44     -2.47
+  Jaswanth           -0.24     -1.46     +1.18     -0.53     -0.87     -0.51     -3.58     -3.02     +0.59
+  Prudhvi            +0.20     -2.40     +2.51     -1.28     -0.42     +0.17     -2.37     -0.75     -3.54
+  Hemanth            +0.86     +0.41     -1.31     -0.47     -1.46     +0.86     -1.40     -2.59     -2.42
+  Junior5            -2.20     -1.82     +0.19     -1.33     -0.42     -0.86     -2.18     -0.25     +2.21
+  Ram                -0.44     -2.45     +2.10     -1.50     +1.03     +1.97     -1.60     -0.56     -3.95
+  SriMani            +0.35     -0.39     -0.90     -1.45     -1.43     +0.10     -0.90     -1.06     +0.34
+  Umesh              -0.71     -1.44     +0.31     -1.41     +0.46     +0.60     +0.41     -0.49     -2.70
+  Srijay             +2.01     -0.67     +0.39     -1.58     +0.67     +1.87     -1.21     -2.42     -3.70
+  Jyothir            +0.02     -1.08     +0.17     -1.31     -0.15     +0.13     -0.81     -2.10     +1.04
+  Junior1            -0.02     -1.37     +1.09     -0.64     +1.31     +2.30     -1.34     -2.51     -2.27
+  Junior2            +1.45     -1.05     +0.73     -1.58     +0.13     +1.20     -0.72     -0.98     -2.15
+  Jagan              +0.94     -2.25     +2.48     -1.55     +1.54     +0.59     +0.06     -0.80     -3.80
+  Lohith             +1.92     -0.92     +1.13     -1.04     -0.93     +0.33     -1.80     -2.53     +1.43
+  Charan             +1.93     +0.35     -1.15     -1.26     +0.43     +1.95     -0.86     -2.10     -1.59
+  Vikhilesh          +0.82     -1.16     +0.91     -1.05     -0.48     +0.93     -0.75     -3.01     +1.50
+  Junior3            +1.07     -1.39     +1.47     -1.01     +1.82     +2.58     -1.31     -0.17     -3.73
+  Nithin             +1.56     -1.27     +1.67     -0.80     -0.43     +2.37     -1.09     -2.84     +0.52
+  Suhail             +0.87     -2.38     +2.64     -1.58     +1.59     +1.58     -0.62     -0.21     -2.13
+  Pradeep            +1.77     -1.53     +1.99     -1.14     +0.25     +1.88     -0.91     -1.28     -1.00
+  Asish              +0.24     -1.55     +0.98     -1.47     -0.25     +2.02     +0.21     -0.68     +0.94
+  Parthasardhi       +2.17     -1.17     +1.50     -1.31     +0.56     +1.66     -1.31     -2.53     +2.56
+  Junior4            +1.79     +0.50     -1.15     -0.76     +1.09     +1.56     +0.38     -1.70     +2.95
+
+======================================================================
+5. FRONT-LEG TECHNIQUE vs PORTUS et al. (2004)
+======================================================================
+  23 bowlers, modal class each
+
+  class                         ours     Portus 42
+  flexor                19 (82.6%)    25 (59.5%)
+  flexor-extender        0 ( 0.0%)     4 ( 9.5%)
+  extender               0 ( 0.0%)     4 ( 9.5%)
+  constant brace         4 (17.4%)     9 (21.4%)
+
+  per bowler  (modal class, and how consistent across deliveries)
+    Anirudh       flexor            12/12
+    Asish         flexor            15/15
+    Charan        constant brace    7/9
+    Hemanth       constant brace    7/13   <- varies
+    Jagan         flexor            12/12
+    Jaswanth      flexor            5/8   <- varies
+    Junior1       flexor            9/13   <- varies
+    Junior2       flexor            11/11
+    Junior3       flexor            9/11
+    Junior4       constant brace    8/9
+    Junior5       flexor            4/4
+    Jyothir       flexor            11/14
+    Lohith        flexor            12/12
+    Nithin        flexor            9/12
+    Parthasardhi  flexor            10/10
+    Pradeep       flexor            9/10
+    Prudhvi       flexor            13/13
+    Ram           flexor            12/12
+    SriMani       constant brace    10/12
+    Srijay        flexor            9/11
+    Suhail        flexor            13/13
+    Umesh         flexor            14/14
+    Vikhilesh     flexor            12/12
+
+======================================================================
+All figures are 300 dpi PNG in report/figures/.
+All tables are booktabs LaTeX in report/tables/ -- \usepackage{booktabs}
+and \input{report/tables/events} to include one.
+======================================================================

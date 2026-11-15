@@ -1,0 +1,8 @@
+videos/
+Papers/
+*.csv
+!bowlers.csv
+*.bak
+__pycache__/
+web/uploads/*
+.git/

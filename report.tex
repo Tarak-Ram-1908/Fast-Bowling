@@ -1,0 +1,706 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{caption}
+\usepackage[hidelinks]{hyperref}
+\usepackage{float}
+\usepackage{enumitem}
+
+\graphicspath{{report/figures/}}
+
+\captionsetup{font=small,labelfont=bf}
+\setlist{itemsep=2pt,parsep=0pt,topsep=4pt}
+
+\title{\textbf{Markerless Detection of Delivery-Stride Events in Cricket
+Fast Bowling from a Single Uncalibrated Camera}}
+
+\author{
+  \textbf{Team 6} \\[6pt]
+  \begin{tabular}{ll}
+    CS24B1031 & Alahari Tarak Ram \\
+    CS24B1039 & Ponnangatti Bala Murugan \\
+    CS24B1046 & Vallipalli Lokesh Kumar \\
+    CS24B1069 & Bellala Parthasaradhi \\
+  \end{tabular} \\[8pt]
+  Indian Institute of Information Technology, \\
+  Design and Manufacturing, Kancheepuram
+}
+
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent
+Every biomechanical variable associated with fast-bowling injury and
+performance is defined at one of three instants: back foot contact, front foot
+contact, or ball release. Locating those instants normally requires a
+laboratory with force plates. We show that all three can be found
+automatically in video from a single uncalibrated phone camera filming side-on
+at 120\,fps, with no markers on the body.
+
+The central idea is a reformulation. Instantaneous events cannot be learned
+directly---each delivery supplies one positive frame against thousands of
+negatives---so we train a classifier on delivery \emph{phases}, which are
+intervals with thousands of examples, and recover the events from the edges of
+the predicted phase blocks. Temporal window stacking supplies the motion
+context that single frames lack.
+
+On 25 bowlers and 284 usable deliveries, evaluated by leave-one-bowler-out
+cross-validation, a random forest locates ball release within 3 frames
+(25\,ms) on 98.5\% of deliveries with a mean error of 6.3\,ms, and front foot
+contact on 91.8\%. Back foot contact is substantially harder at 59.0\%, and we
+argue this reflects a property of the event rather than of the model. Nine
+kinematic variables measured at the detected instants on 262 legal deliveries
+are compared with published elite reference values; plant angle agrees to
+within 0.1 standard deviations, while the remaining variables describe a
+single coherent pattern of a front leg that collapses rather than braces.
+
+We also report a result about evaluation itself: across seven models, the
+per-frame ranking and the event ranking disagree, and a bidirectional LSTM
+that leads per-frame accuracy by five points is the worst model tested at
+locating front foot contact.
+\end{abstract}
+
+\section{Introduction}
+
+Fast bowling imposes the highest injury burden of any action in cricket, and
+lumbar stress fractures in particular have been linked to measurable features
+of technique. Portus et al.~\cite{portus2004} found shoulder counter-rotation
+of $41 \pm 10^\circ$ in a lumbar stress fracture group against $19 \pm
+10^\circ$ in uninjured bowlers. Worthington~\cite{worthington2010} established
+reference kinematics for twenty elite professionals.
+
+Both studies required a motion-capture laboratory. Such facilities are rare and
+expensive, so the overwhelming majority of developing fast bowlers receive no
+biomechanical feedback at all---their coaches work from the naked eye, which
+cannot resolve a knee angle at an instant lasting eight milliseconds.
+
+Markerless pose estimation from ordinary video is the obvious alternative, and
+it is maturing quickly. But a review of markerless capture~\cite{opencap2026}
+reports an RMSE of $17.61 \pm 7.72^\circ$ for OpenCap on cricket bowling
+specifically, using a multi-camera rig, and concludes that such systems perform
+\emph{most} accurately for sagittal-plane measurements. Cricket bowling is a
+hard case even for purpose-built markerless systems.
+
+\subsection{The gap}
+
+Two recent works approach this problem from different directions. A machine
+learning study of fast-bowling kinematics using MediaPipe requires the operator
+to \emph{enter the ball-release frame by hand}, and lists automatic detection as
+future work. A deep-learning system for illegal-action detection locates
+shoulder and release frames but never foot contact, and measures only elbow
+extension for legality rather than kinematics.
+
+Meanwhile, the computer-vision literature has a well-developed subfield for
+exactly this problem. \emph{Precise event spotting}~\cite{pes2025} concerns
+frame-accurate detection of instantaneous events, as distinct from action
+spotting over intervals, and reports results at tolerances of one to five
+frames. Its surveyed datasets cover soccer, tennis, table tennis, basketball,
+badminton, figure skating, diving and gymnastics. Cricket appears in none of
+them.
+
+So the sport whose key measurements are \emph{defined} at three instants has
+not been addressed by the field that specialises in finding instants, and the
+one published phone-based system for fast-bowling kinematics asks a human to
+find the most important instant manually.
+
+\subsection{Contribution}
+
+\begin{enumerate}
+  \item A reformulation of instantaneous event detection as per-frame phase
+        classification, with events recovered from predicted block edges.
+  \item A normalisation scheme that removes camera distance, image aspect
+        ratio, direction of travel and bowler handedness from the feature
+        space, making calibration unnecessary.
+  \item Temporal window stacking, which we show is a hand-weighted
+        one-dimensional convolution, and which cuts fragmented phase blocks
+        from 25 to 4 and raises both-contact accuracy by ten percentage
+        points.
+  \item An evaluation on 25 bowlers under leave-one-bowler-out
+        cross-validation, including the finding that per-frame accuracy and
+        event accuracy rank models differently.
+  \item An explicit statement of what a single side-on camera cannot recover,
+        and why.
+\end{enumerate}
+
+\section{Background}
+
+\subsection{The three instants}
+
+The delivery stride is the final stride before the ball is bowled.
+\textbf{Back foot contact (BFC)} is the frame the back foot lands to begin it.
+\textbf{Front foot contact (FFC)} is the frame the front foot lands and braces
+against the ground. \textbf{Ball release} is the frame the ball leaves the
+hand. At 120\,fps the whole stride spans roughly thirty frames, so one frame of
+error is 8.3\,ms.
+
+\subsection{Events versus phases}
+
+An \emph{event} is an instant---a single frame. A \emph{phase} is an
+interval. This distinction determines the entire method. Training a classifier
+to recognise an event means one positive example per delivery against several
+hundred negatives, and the frame immediately before release is visually almost
+identical to release itself.
+
+Training on phases is a well-posed problem: each class has thousands of
+examples, and the classes are visually distinguishable. We therefore
+label every frame with the phase it belongs to, train on that, and read the
+events off the boundaries:
+
+\begin{itemize}
+  \item BFC $=$ the first frame of the predicted \texttt{bfc\_phase} block
+  \item FFC $=$ the first frame of the predicted \texttt{ffc\_phase} block
+  \item Release $=$ the last frame of the predicted \texttt{ffc\_phase} block
+\end{itemize}
+
+A second benefit follows. Because only the block \emph{edges} are read, the
+model may be wrong in the \emph{middle} of a block without affecting the
+extracted events. Per-frame accuracy therefore understates event accuracy, and
+the two are not interchangeable---a point Section~\ref{sec:disagree} develops
+into a result.
+
+\section{Dataset}
+
+Twenty-five fast bowlers were filmed over two sessions in September and October
+2026. Each was recorded side-on, perpendicular to the run-up, with a single
+mobile phone at 120\,fps and no calibration of any kind.
+
+\input{report/tables/dataset}
+
+Of 304 clips, 284 were usable; the remainder were excluded for a visible
+reason recorded in the data, most often a pose tracked onto a background
+person. Legality was annotated separately, and 262 of the 284 (92.3\%) were
+legal deliveries. The elite reference values describe screened legal actions,
+so all kinematic comparisons use the legal subset only.
+
+Capture was not perfectly stable: 282 clips recorded at exactly 120\,fps and 22
+drifted between 115.6 and 119.6\,fps, a worst-case deviation of 3.7\%. All
+millisecond conversions in this report assume 120\,fps, so timings for those
+clips carry up to 3.7\% additional error. This does not affect any conclusion.
+
+\subsection{Annotation}
+
+Five boundary frames were marked per delivery with a purpose-built tool:
+run-up start, BFC, FFC, release, and follow-through end. Marking proceeded
+\emph{backwards} from release, which is the most visually certain instant,
+anchoring the uncertain boundaries against a confident one.
+
+Those five marks were expanded into a per-frame phase label following the
+phase definitions of Worthington~\cite{worthington2010}, yielding 35{,}466
+labelled frames. Figure~\ref{fig:balance} shows the distribution.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.78\textwidth]{fig1_class_balance.png}
+  \caption{Phase label distribution across 35{,}466 annotated frames. The two
+  contact phases are the least frequent and the most important, which is why
+  class weighting is applied throughout.}
+  \label{fig:balance}
+\end{figure}
+
+\section{Method}
+
+\subsection{Pose estimation}
+
+MediaPipe Pose Landmarker (\texttt{heavy}) produces 33 body landmarks per
+frame with per-landmark visibility. The \texttt{heavy} variant was chosen
+because ankle and wrist positions at ball release are the fastest-moving and
+hardest landmarks in the sequence.
+
+\subsection{Normalisation: the substitute for calibration}
+
+Raw landmarks depend on where the bowler stood, how far the phone was, the
+image aspect ratio, which way the bowler ran and which arm they bowled with.
+Four operations remove all of it.
+
+\paragraph{Aspect correction.} Landmark coordinates are normalised to $[0,1]$
+independently on each axis, so on a 16:9 frame equal numeric distances are
+unequal real distances. Multiplying $x$ by $W/H$ restores isotropy. Omitting
+this step distorts every computed angle; a true $45^\circ$ limb reads as
+approximately $68^\circ$.
+
+\paragraph{Direction.} A straight line is fitted to the hip midpoint's
+horizontal position over the clip. A positive slope means left-to-right travel;
+otherwise $x$ is negated. Direction is recovered from the data, not supplied by
+an operator.
+
+\paragraph{Body-relative frame.} With $\mathbf{h}$ the hip midpoint,
+$\mathbf{s}$ the shoulder midpoint and $T = \lVert \mathbf{s} - \mathbf{h}
+\rVert$ the torso length, every landmark $\mathbf{p}$ becomes
+\[
+  \mathbf{q} = \frac{\mathbf{p} - \mathbf{h}}{T}.
+\]
+Translation removes position in frame; division by torso length removes camera
+distance and body size. A bowler filmed at 8\,m and one at 15\,m in the same
+pose yield identical features. \textbf{This is what replaces camera
+calibration.}
+
+\paragraph{Order statistics.} No feature refers to left or right. The
+\emph{leading} leg is whichever ankle is further forward; the \emph{high} arm
+is whichever wrist is higher. A left-arm bowler's leading leg is their right
+and a right-arm bowler's is their left, so defining features by role rather
+than by side eliminates handedness entirely---with no flag that can be set
+backwards.
+
+Sixteen features result: four joint angles, eight distances in torso units,
+and four orientation measures.
+
+\subsection{Window stacking}
+
+A single frame cannot express motion, yet a human identifies front foot contact
+by seeing the foot \emph{stop}. Each frame is therefore given the feature
+values of its neighbours at offsets $\pm 1 \dots \pm 5$, plus three difference
+channels per feature:
+\[
+  f^{d1}_i = f_i - f_{i-1}, \qquad
+  f^{d3}_i = f_i - f_{i-3}, \qquad
+  f^{v}_i  = \tfrac{1}{2}\left(f_{i+1} - f_{i-1}\right).
+\]
+Sixteen features become $16 \times (1 + 10 + 3) = 224$. Windows are built per
+clip and clamped at clip boundaries so no frame borrows from another delivery.
+
+We note that this operation is a one-dimensional convolution of width 11 with
+hand-set weights. Section~\ref{sec:ablation} measures what the window buys, and
+Section~\ref{sec:models} tests whether learning those weights instead helps.
+
+\subsection{Validation protocol}
+
+Evaluation uses \textbf{GroupKFold with the bowler as the group}: 24 folds,
+each holding out one complete bowler. This is the central methodological
+choice. Splitting by frame would place frames 8.3\,ms apart---visually near
+identical---in both training and test sets, producing an accuracy figure that
+measures memorisation rather than generalisation. Every number reported here
+comes from a model that never saw the test bowler.
+
+One bowler was excluded from the classifier entirely: their action could not be
+segmented into the standard phases by any annotator. The classifier therefore
+trains on 24 bowlers and 27{,}840 frames.
+
+That exclusion is measured rather than asserted. Running the pipeline with that
+bowler included gives a mean front-foot-contact error of 117 frames and a mean
+release error of 130 frames for him, against 1--4 frames for every other bowler;
+two of his clips violate the back-foot-before-front-foot ordering, and ten of
+his twelve clips yield no front-foot-contact block at all. The exclusion
+reflects a property of the action, not a convenience.
+
+\subsection{Event extraction}
+
+Per-frame predictions are converted to instants in four steps. Class
+probabilities are median-filtered over 9 frames---filtering probabilities
+rather than hard labels removes spikes without dragging block edges. Contiguous
+blocks are identified. The \texttt{bfc\_phase} and \texttt{ffc\_phase} blocks
+maximising combined confidence are selected \emph{subject to the constraint
+that the BFC block begins first}, which is true of every bowling action ever
+performed and rescues clips where a spurious fragment appears after release.
+Events are then read off the block edges.
+
+\textbf{A clip in which no block is found counts as a failure}, not as a
+missing value. Rates reported below are shares of all 268 deliveries, so a
+model that declines the hard cases is not rewarded for it.
+
+\section{Results}
+
+\subsection{Event detection}
+
+\input{report/tables/events}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.82\textwidth]{fig2_tolerance.png}
+  \caption{Event detection accuracy as a function of tolerance, random forest,
+  leave-one-bowler-out, as a share of all 268 deliveries. The three curves
+  separate in the order release, front foot contact, back foot
+  contact---which is the order of how sharply each event is defined in the
+  video.}
+  \label{fig:tolerance}
+\end{figure}
+
+Ball release is located within 3 frames on 98.5\% of deliveries with a mean
+absolute error of 0.76 frames (6.3\,ms). Front foot contact reaches 91.8\%.
+Back foot contact reaches 59.0\%, with a mean error of 3.54 frames (29.5\,ms).
+Both contacts fall within 3 frames on 53.2\% of deliveries.
+
+Two observations about the weakest result. First, the ordering is physical:
+the ball separates visibly from the hand, the front foot brakes sharply, and
+the back foot \emph{rolls} through rather than arriving. Second, this ordering
+matches an independent finding in gait analysis, where published limits of
+agreement for trained human annotators are 24\,ms for heel strike and 16\,ms
+for toe-off, but rise to 72\,ms for heel-off and 80\,ms for flat
+foot~\cite{gait2022}---the events where the foot rolls. Our mean release error
+of 6.3\,ms is smaller than the published disagreement between humans on any of
+those events.
+
+\subsection{Does window stacking help?}
+\label{sec:ablation}
+
+Window stacking is claimed as a contribution, so it is tested directly. The
+pipeline was run end to end twice on identical folds and identical bowlers,
+differing only in whether the $\pm5$ window and its difference channels were
+present. Both runs count a clip with no phase block as a failure, and all
+rates are shares of the same 268 deliveries.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Window stacking ablation. Random forest, 24 bowlers, 27{,}840
+  frames, leave-one-bowler-out, identical folds. The 16 base features alone
+  against the same features stacked across $\pm5$ frames with first
+  differences (224 columns).}
+  \label{tab:ablation}
+  \small
+  \begin{tabular}{lrr}
+    \toprule
+     & 16 features & 224 stacked \\
+    \midrule
+    Per-frame accuracy & 80.0\% & \textbf{85.2\%} \\
+    Ball release within 3 frames & 94.4\% & \textbf{98.5\%} \\
+    Front foot contact within 3 frames & 88.1\% & \textbf{91.8\%} \\
+    Back foot contact within 3 frames & 51.1\% & \textbf{59.0\%} \\
+    Both contacts within 3 frames & 42.5\% & \textbf{53.0\%} \\
+    \midrule
+    Mean release error & 1.00 fr (8.4\,ms) & \textbf{0.76 fr (6.3\,ms)} \\
+    Fragmented phase blocks & 25 & \textbf{4} \\
+    Clips with no block found & 2 & \textbf{1} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Every measure improves. The two that matter most are at the bottom: fragmented
+blocks fall from 25 to 4, and the share of deliveries where \emph{both} contacts
+land within 3 frames rises by more than ten percentage points. Fragmentation is
+the failure mode that breaks event extraction outright---a phase predicted as
+two blocks with a gap has no single edge to read---so reducing it is worth more
+than the per-frame accuracy gain suggests.
+
+The back foot contact gain (51.1\% to 59.0\%) is the largest of the three
+events, which is consistent with the account in Section~\ref{sec:disagree}: the
+diffuse event benefits most from temporal context, and $\pm5$ frames is the
+smallest amount of context that helps it.
+
+\subsection{Model comparison}
+\label{sec:models}
+
+Seven models were trained on identical folds. Each answers a question rather
+than filling a row: logistic regression is the linear baseline; the random
+forest is the incumbent; extremely randomised trees test whether the forest
+overfits through its split thresholds; gradient boosting is the strongest
+classical competitor on tabular data; the MLP tests whether a dense network
+alone helps; the TCN learns the convolution that window stacking performs by
+hand; and the bidirectional LSTM can learn temporal ordering that is otherwise
+imposed afterwards.
+
+\input{report/tables/models_perframe}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.82\textwidth]{fig3_models_perframe.png}
+  \caption{Per-frame accuracy and macro F1, leave-one-bowler-out. Exact
+  values are in Table~\ref{tab:models_perframe}.}
+  \label{fig:perframe}
+\end{figure}
+
+\subsection{Per-frame accuracy and event accuracy disagree}
+\label{sec:disagree}
+
+\input{report/tables/models_events}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.82\textwidth]{fig4_models_events.png}
+  \caption{Event detection within 3 frames, by model, as a share of all 268
+  deliveries. Compare the ordering here with Figure~\ref{fig:perframe}.}
+  \label{fig:modelevents}
+\end{figure}
+
+The two rankings do not agree. The bidirectional LSTM leads per-frame accuracy
+by more than five points (0.915 against 0.863 for the next best) yet is
+\textbf{the worst of all seven models at front foot contact}, at 72.8\% against
+the forest's 91.8\%---while simultaneously being by far the best at back foot
+contact, at 79.9\% against 59.0\%.
+
+Both halves of that trade have the same explanation. Back foot contact is
+diffuse: the foot rolls, no single frame is distinguished, and the instant must
+be inferred from the rhythm of the whole stride, which is exactly what
+long-range bidirectional context supplies. Front foot contact is sharp: the
+braking signature is local, a window of $\pm 5$ frames already captures it, and
+smoothing over a long context blurs the boundary.
+
+We further caution that the LSTM's per-frame advantage is partly an artefact.
+Its largest per-class gain is on the \texttt{none} class (F1 0.892 against
+0.623 for the forest), which denotes frames outside the delivery. Those are
+determined largely by where each clip was trimmed, and a model reading the
+whole sequence can learn clip position rather than biomechanics. This cannot
+affect the event results, which read only the two contact-phase blocks, but it
+does mean the 0.915 figure should not be quoted as a capability.
+
+Compute cost differs by more than an order of magnitude and is worth recording:
+extremely randomised trees reached 0.847 in 236\,s where the random forest
+reached 0.852 in 5{,}052\,s, and gradient boosting beat the forest outright in
+a sixth of its time.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.70\textwidth]{fig5_confusion.png}
+  \caption{Row-normalised confusion matrix for the random forest, the model
+  reported throughout. Confusions concentrate between adjacent phases, which
+  is the benign failure mode: an error in the middle of a block does not move
+  its edge.}
+  \label{fig:confusion}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.82\textwidth]{fig7_per_bowler.png}
+  \caption{Random forest accuracy on each held-out bowler. The spread matters
+  more than the mean for a system intended to work on someone it has never
+  seen.}
+  \label{fig:perbowler}
+\end{figure}
+
+\subsection{Kinematic measurement}
+
+Nine variables were computed at the detected instants on 262 legal deliveries
+from 23 bowlers, and compared with Worthington's elite
+values~\cite{worthington2010}. Lengths are reported as a percentage of standing
+height, obtained from torso-relative measurements using the anthropometric
+constant $0.288$ of Winter~\cite{winter1990}: the shoulder joint sits at
+$0.818H$ and the hip at $0.530H$, so the trunk spans $0.288H$. No bowler's
+height was measured.
+
+\input{report/tables/measurements}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.82\textwidth]{fig6_measurements.png}
+  \caption{Measured kinematics as deviations from the elite mean. The dot is
+  our mean; the bar is our own spread (one standard deviation of our
+  deliveries, in elite standard deviations). Plant angle sits at $+0.07$,
+  which is the validation anchor: there is no mechanism by which a broken
+  measurement chain produces agreement on one variable and a coherent
+  pattern across the rest.}
+  \label{fig:measurements}
+\end{figure}
+
+The table reports our own standard deviation beside the elite one, and the
+final column gives the share of our \emph{individual} deliveries falling inside
+the elite one-standard-deviation band. Both matter: a shifted mean alone cannot
+distinguish a whole group that differs from a handful of outliers dragging an
+otherwise typical cohort.
+
+These are not nine independent findings. Read together they describe one
+mechanism. A stride 1.56 standard deviations shorter than elite leaves the
+front leg less braced, so the knee flexes more ($+0.89$) and extends less
+($-1.19$), and remains more flexed at release ($-1.27$). Release height is also
+lower on average ($-1.09$), though Section~\ref{sec:universal} shows this
+particular variable varies too widely between bowlers to be treated as a group
+property. Reduced backward trunk lean at back foot contact ($-1.09$) is
+the same pattern one step earlier. \textbf{The front leg collapses rather than
+bracing}---the expected difference between club and professional bowlers.
+
+Foot strike angle ($+1.16$) does not belong to that pattern and is the one
+result we cannot currently explain. Footwear is a plausible confounder: the
+cohort comprised 13 bowlers in shoes, 7 in sandals and 5 barefoot, with none in
+spikes.
+
+\subsection{Is the pattern universal?}
+\label{sec:universal}
+
+A group mean can be produced either by a cohort that differs uniformly or by a
+few extreme individuals. Figure~\ref{fig:perbowlerz} separates the two by
+showing every bowler's mean deviation on every variable.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.95\textwidth]{fig9_per_bowler_z.png}
+  \caption{Each bowler against the elite reference, in elite standard
+  deviations, sorted by overall deviation. A column of uniform colour means
+  the whole cohort differs on that variable; a column with a few saturated
+  cells against a pale background means a small number of bowlers carry the
+  group mean.}
+  \label{fig:perbowlerz}
+\end{figure}
+
+\input{report/tables/per_bowler_z}
+
+The columns separate sharply into three kinds.
+
+\textbf{Two variables are universal.} Knee extension is below the elite mean
+for \emph{all 23 bowlers} (range $-1.58$ to $-0.47$), and stride is below for
+all 23 (range $-3.02$ to $-0.17$). Not one bowler is an exception. These are
+properties of the cohort, and the group means genuinely describe every
+individual in it.
+
+\textbf{Front knee angle at release is near-universal}, below the elite mean
+for 20 of 23 bowlers---and the three exceptions are informative rather than
+noise. They are Hemanth ($+0.41$), Charan ($+0.35$) and Junior4 ($+0.50$):
+precisely three of the four bowlers independently classified as
+\emph{constant brace} in Section~\ref{sec:technique}. The same pattern appears
+on knee flexion, where all four exceptions to the group tendency---Hemanth,
+SriMani, Charan and Junior4---are exactly the four constant-brace bowlers.
+
+This is the strongest internal evidence in the study. The continuous kinematic
+measurement and the discrete Portus classification are computed from different
+quantities, and they identify the same four individuals as behaving
+differently. Agreement between two independent analyses at the level of named
+individuals is a much stronger check than agreement between two group means.
+
+\textbf{Four variables are mixed and must not be reported as group findings.}
+Front knee angle at front foot contact spans $-2.95$ to $+2.17$ with 17 bowlers
+above the elite mean and 6 below; plant angle is almost evenly split, as
+expected for the variable we use as a validation anchor; and release height
+spans $-3.95$ to $+2.95$. For these, the group mean is an average over a
+genuinely heterogeneous cohort and describes no particular bowler.
+
+Release height deserves specific caution. A spread of nearly seven elite
+standard deviations across 23 bowlers is larger than the biomechanical
+variation one would expect, and it is the measurement with the most
+indirection---release is detected at the wrist rather than the ball, and the
+lower ankle stands in for ground level. We report it, but we would not draw a
+conclusion from it.
+
+This figure is also the most useful output for a coach. A group mean says
+nothing actionable about any particular bowler, whereas a single row identifies
+which variables that bowler departs from the reference on, and by how much.
+
+\subsection{Front-leg technique classification}
+\label{sec:technique}
+
+\input{report/tables/technique}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.78\textwidth]{fig8_technique.png}
+  \caption{Front-leg technique against Portus et al.~\cite{portus2004}.}
+  \label{fig:technique}
+\end{figure}
+
+Applying the classification of Portus et al.---a $10^\circ$ threshold on
+flexion and on extension between FFC and release---19 of 23 bowlers (82.6\%)
+are flexors against 59.5\% in the elite cohort, and \textbf{no bowler in our
+sample classifies as an extender or flexor-extender} against 19\% combined in
+theirs.
+
+\input{report/tables/technique_per_bowler}
+
+Per-bowler classification also reports consistency---the share of a bowler's own
+deliveries falling in their modal class. A bowler below roughly 70\% is not
+reliably one class, and for them the group classification is a summary rather
+than a description.
+
+This corroborates the measurement result independently, and does so at two
+levels. At the group level, a cohort in which no bowler extends the front knee
+(knee extension is below elite for all 23) cannot produce extender classes. At
+the individual level, the four constant-brace bowlers are exactly the four who
+depart from the group tendency on knee flexion and knee angle at release, as
+Section~\ref{sec:universal} shows. Two readings remain open.
+Either club bowlers genuinely do not brace and extend as professionals do, or
+our measurement systematically compresses extension. We cannot distinguish them
+with the present data, and prefer to say so.
+
+\section{Limitations}
+
+\paragraph{Ground truth is human annotation.} The reference marks were made by
+one annotator, who is also an author. Published inter-annotator limits of
+agreement on analogous gait events~\cite{gait2022} provide context, but an
+independent second annotation of a random subset is required before these
+figures should be treated as validated, and is the first item of future work.
+
+\paragraph{Measurement accuracy is not validated.} We report that measurements
+at detected instants are \emph{repeatable}, not that they are accurate in an
+absolute sense. A multi-camera markerless system recorded $17.61 \pm
+7.72^\circ$ RMSE on cricket bowling~\cite{opencap2026}; a single-camera 2D
+pipeline should not be assumed to do better. The comparison with
+Worthington is cross-study---different cohort, equipment and conventions---and
+agreement indicates consistency, not accuracy.
+
+\paragraph{The transverse plane is unrecoverable.} Shoulder counter-rotation is
+the strongest published technique--injury association~\cite{portus2004} and is a
+transverse-plane rotation measured at back foot contact. Colyer et
+al.~\cite{colyer2018} state the constraint precisely: two-dimensional analysis
+recovers three degrees of freedom from a minimum of two known points, whereas
+six degrees of freedom require at least three non-collinear points, which a
+single view cannot supply. The side-on / semi-open / front-on / mixed trunk
+classification is therefore reported as \emph{not determinable from this data}.
+We make no claim whatsoever about injury risk. A second camera placed behind
+the bowler would supply the missing plane and is the clearest line of future
+work.
+
+\paragraph{Other limitations.} The trunk ratio $0.288$ is a population mean and
+contributes roughly $\pm 2$--$3$ percentage points of individual error. Release
+is detected at the wrist rather than the ball, biasing release height
+approximately 10\,cm low; the per-bowler spread on that variable
+(Section~\ref{sec:universal}) suggests it is also the least reliable of the
+nine, and we draw no conclusion from it. The sample is 25 club bowlers from one institute,
+with no injury outcomes.
+
+\section{Conclusion}
+
+Back foot contact, front foot contact and ball release can be located
+automatically in fast-bowling video from a single uncalibrated side-on camera.
+Ball release is found within 25\,ms on 98.5\% of deliveries and front foot
+contact on 91.8\%, with no markers, no calibration and no laboratory. The
+enabling idea is to train on phases and recover events from block edges; the
+enabling engineering is normalisation to the bowler's own torso, which makes
+camera geometry irrelevant.
+
+Back foot contact remains the weak result at 59.0\%, and we have argued this is
+a property of an event that rolls rather than arrives---supported both by the
+ordering of our own three events and by published human annotation agreement on
+analogous gait events. The bidirectional LSTM's performance there, 79.9\%
+against 59.0\%, suggests long-range temporal context is the right remedy, and a
+hybrid that uses sequence context for the diffuse event and local context for
+the sharp one is the natural next step.
+
+Finally, this work is as notable for what it declines to claim. The strongest
+published link between bowling technique and lower-back injury is a
+transverse-plane quantity that one camera geometrically cannot recover. We
+report it as unmeasurable rather than approximating it, because a confident
+wrong number about a young athlete's injury risk is worse than an honest gap.
+
+\begin{thebibliography}{9}
+
+\bibitem{portus2004}
+M.~Portus, B.~Mason, B.~Elliott, M.~Pfitzner, and R.~Done,
+``Technique factors related to ball release speed and trunk injuries in high
+performance cricket fast bowlers,''
+\emph{Sports Biomechanics}, vol.~3, no.~2, pp.~263--284, 2004.
+
+\bibitem{worthington2010}
+P.~Worthington,
+\emph{Fast bowling biomechanics and the lower back},
+Ph.D. thesis, Loughborough University, 2010.
+
+\bibitem{colyer2018}
+S.~L.~Colyer, M.~Evans, D.~P.~Cosker, and A.~I.~T.~Salo,
+``A review of the evolution of vision-based motion analysis and the
+integration of advanced computer vision methods towards developing a markerless
+system,''
+\emph{Sports Medicine --- Open}, vol.~4, no.~24, 2018.
+
+\bibitem{winter1990}
+D.~A.~Winter,
+\emph{Biomechanics and Motor Control of Human Movement},
+2nd ed., Wiley, 1990.
+
+\bibitem{opencap2026}
+``Validations and applications of markerless motion capture using OpenCap: a
+scoping review,''
+\emph{Frontiers in Digital Health}, 2026.
+
+\bibitem{pes2025}
+``Action spotting and precise event detection in sports: datasets, methods and
+challenges,''
+arXiv:2505.03991, 2025.
+
+\bibitem{gait2022}
+``Human gait-labeling uncertainty and a hybrid model for gait segmentation,''
+\emph{Frontiers in Neuroscience}, 2022.
+
+\end{thebibliography}
+
+\end{document}

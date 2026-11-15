@@ -19,7 +19,7 @@ Built as a data science course project at IIITDM Kancheepuram.
 ## How it works
 
 MediaPipe gives 33 body landmarks per frame. Sixteen per-frame features are
-computed from those, then stacked across a eleven-frame window so the model can
+computed from those, then stacked across an eleven-frame window so the model can
 see motion rather than only position. A random forest labels each frame with
 the phase of the delivery it belongs to, the phase blocks give the three event
 instants — back foot contact, front foot contact, ball release — and the twelve
@@ -28,13 +28,18 @@ measurements are geometry at those frames.
 ## Accuracy
 
 Validated leave-one-bowler-out across 24 bowlers, so every number below comes
-from a model that never saw that bowler during training.
+from a model that never saw that bowler during training. Rates are shares of
+all 268 deliveries: a clip that yields no phase block counts as a failure, not
+as a missing value.
 
 | | within 3 frames of a hand mark |
 |---|---|
 | ball release | 98.5% |
-| front foot contact | 91.4% |
-| back foot contact | 59.7% |
+| front foot contact | 91.8% |
+| back foot contact | 59.0% |
+
+Mean absolute timing error is 0.76 frames (6.3 ms) for ball release and 1.53
+frames (12.7 ms) for front foot contact.
 
 Two measurements reproduce laboratory values almost exactly: plant angle
 36.6° against the elite 36.3 ± 3.9, and front knee at foot contact 167.8°

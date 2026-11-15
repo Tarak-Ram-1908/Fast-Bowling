@@ -10,3 +10,18 @@ features.csv
 feat_noab*.csv
 frame_labels.csv
 predictions.csv
+
+cloudflared.exe
+
+# large regenerable results
+predictions_all.csv
+pred_nostack.csv
+
+# per-bowler data - identifiable, pending consent
+labels.csv
+legality.csv
+bowlers.csv
+measurements.csv
+technique.csv
+events_*.csv
+ev_nostack.csv

@@ -36,17 +36,22 @@
       moves the background the model uses for scale.</span></li>
     <li><b>One delivery per clip</b><span>From run-up to follow-through. Three
       to five seconds is plenty.</span></li>
+    <li><b>Send six, not one</b><span>Upload several deliveries together and the
+      report leads with their average. A single clip carries event-detection
+      noise that largely cancels over six.</span></li>
   </ul>
 </div></section>
 
 <section class="upload"><div class="wrap">
-  <h2>Analyse a delivery</h2>
+  <h2>Analyse your deliveries</h2>
+  <p>One clip works. Several clips of the same bowler work better: the report
+     averages them and leaves out any value that looks like a detection error.</p>
   {% if not model_ready %}
   <div class="warn"><b>The model has not been trained yet.</b>
     Run <code>py -3.13 train_production.py feat_noab_win.csv</code> first.</div>
   {% endif %}
   <form id="f" class="drop">
-    <input type="file" name="video" id="video" accept="video/mp4,video/quicktime,.mp4,.mov,.m4v">
+    <input type="file" name="video" id="video" multiple accept="video/mp4,video/quicktime,.mp4,.mov,.m4v">
     <button type="submit" id="go" {% if not model_ready %}disabled{% endif %}>Measure it</button>
   </form>
   <div class="bar" id="bar"><i id="fill"></i></div>
@@ -65,10 +70,11 @@ f.addEventListener('drop',e=>{e.preventDefault();f.classList.remove('hot');
 
 f.addEventListener('submit', async e=>{
   e.preventDefault(); err.textContent='';
-  const file=document.getElementById('video').files[0];
-  if(!file){err.textContent='Choose a video first.';return;}
+  const files=[...document.getElementById('video').files];
+  if(!files.length){err.textContent='Choose a video first.';return;}
+  if(files.length>{{ max_files }}){err.textContent='Up to {{ max_files }} deliveries at a time.';return;}
   go.disabled=true; go.textContent='Working'; bar.classList.add('on');
-  const fd=new FormData(); fd.append('video',file);
+  const fd=new FormData(); files.forEach(x=>fd.append('video',x));
   let r;
   try{ r=await (await fetch('/analyse',{method:'POST',body:fd})).json(); }
   catch(_){ return fail('Upload failed. Check the file and try again.'); }

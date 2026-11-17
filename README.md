@@ -35,6 +35,28 @@ Two measurements reproduce laboratory values almost exactly: plant angle
 36.6Â° against the elite 36.3 Â± 3.9, and front knee at foot contact 167.8Â°
 against 164.1 Â± 6.1.
 
+## Reading a single delivery
+
+The numbers above are validated for the cohort. One clip is a much weaker
+measurement, mostly because back foot contact is right only 59% of the time,
+so the report guards each delivery:
+
+- **The chosen frames are shown.** Each event frame is drawn with its skeleton
+  and can be stepped ±1 or ±5 frames and re-measured, or confirmed as right.
+- **Plausibility check.** Every value is also scored against our own 262
+  deliveries (`models/cohort_stats.json`, rebuilt with
+  `py -3.13 analyze.py --build-cohort measurements.csv`). Past 3 cohort sd it
+  is reported as a probable detection error, not a finding; two or more values
+  past 2 sd together raise a warning naming the likely mis-detected event.
+- **Confidence per measurement**, inherited from the event frames it depends
+  on: back foot contact starts low, and phase fragmentation, an unsure
+  classifier edge, pose drop-out or hidden legs lower it further.
+- **Several deliveries are averaged.** Upload up to twelve clips at once; the
+  report leads with their mean and spread and leaves implausible values out.
+- **Explanations, not prescriptions.** Values more than 1 sd from elite get a
+  rule-based sentence quoting the published association, stated as an
+  association across bowlers, never as advice on what to change.
+
 ## What it does not do
 
 It does not assess whether the bowling action is legal â€” elbow extension past

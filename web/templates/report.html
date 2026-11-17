@@ -12,51 +12,140 @@
   <span class="mark">Delivery <b>Stride</b></span>
 </div></header>
 
-{% set c = r.comparison %}
-{% set m = r.measurements %}
+{% macro conf_chip(level, why) -%}
+  <span class="chip c-{{ level }}" {% if why %}title="{{ why }}"{% endif %}>{{ level }}</span>
+{%- endmacro %}
 
 <section class="rhead"><div class="wrap">
   <h2>Delivery report</h2>
-  <p>{{ name }} — {{ r.frames_analysed }} frames at {{ r.fps }} fps.
-     Back foot contact at frame {{ r.events.bfc }}, front foot contact at
-     {{ r.events.ffc }}, release at {{ r.events.release }}.</p>
+  {% if done|length > 1 %}
+  <p>{{ done|length }} deliveries analysed. The table below is their average;
+     each delivery, with the frames the system chose, follows it.</p>
+  {% else %}
+  {% set r = done[0][1].result %}
+  <p>{{ done[0][1].name }} — {{ r.frames_analysed }} frames at {{ r.fps }} fps.
+     One delivery carries event-detection noise; upload several of the same
+     bowler and the report averages them.</p>
+  {% endif %}
+  {% for d in failed %}
+  <p class="err">{{ d.name }} could not be analysed: {{ d.error }}</p>
+  {% endfor %}
 </div></section>
 
-<section class="wrap" style="padding:0 24px">
-  <table>
-    <caption>Measured against Worthington (2010), twenty elite male fast bowlers.
-      Values more than one standard deviation from the elite mean are marked.</caption>
-    <thead><tr><th>Measurement</th><th>You</th><th>Elite</th><th>Difference</th></tr></thead>
+{% if summary %}
+<section class="wrap block">
+  <div class="table-scroll"><table>
+    <caption>Mean over {{ done|length }} deliveries, against Worthington (2010),
+      twenty elite male fast bowlers. ± is the spread between your deliveries.
+      Values that failed the plausibility check on unchecked frames are left
+      out of the mean.</caption>
+    <thead><tr><th>Measurement</th><th>You</th><th>Elite</th><th>Difference</th><th>Deliveries</th></tr></thead>
     <tbody>
-    {% for key, label, unit in [
-        ('front_knee_ffc','Front knee at foot contact','°'),
-        ('front_knee_release','Front knee at release','°'),
-        ('knee_flexion','Knee flexion after contact','°'),
-        ('knee_extension','Knee extension before release','°'),
-        ('plant_angle','Plant angle','°'),
-        ('foot_strike','Foot strike angle','°'),
-        ('lean_back_bfc','Trunk lean at back foot contact','°'),
-        ('trunk_lean_ffc','Trunk lean at front foot contact','°'),
-        ('trunk_lean_release','Trunk lean at release','°'),
-        ('arm_angle_release','Bowling arm against the trunk','°'),
-        ('stride_pct_height','Delivery stride','% height'),
-        ('release_pct_height','Release height','% height')] %}
-      {% if m.get(key) is not none %}
-      {% set cm = c.get(key) %}
-      <tr {% if cm and cm.z|abs > 1 %}class="flag"{% endif %}>
-        <td>{{ label }}</td>
-        <td class="v">{{ '%.1f'|format(m[key]) }}{{ unit if unit != '°' else '' }}</td>
-        <td>{% if cm %}{{ cm.ref_mean }} ± {{ cm.ref_sd }}{% else %}not published{% endif %}</td>
-        <td class="z">{% if cm %}{{ '%+.1f'|format(cm.z) }} sd{% else %}—{% endif %}</td>
+    {% for key, s in summary.items() %}
+      <tr {% if s.z is defined and s.z|abs > 1 %}class="flag"{% endif %}>
+        <td>{{ s.label }}</td>
+        <td class="v">{{ '%.1f'|format(s.value) }}{{ s.unit if s.unit != '°' else '' }}
+          {% if s.spread is not none %}<small class="pm">± {{ '%.1f'|format(s.spread) }}</small>{% endif %}</td>
+        <td>{% if s.ref_mean is defined %}{{ s.ref_mean }} ± {{ s.ref_sd }}{% else %}not published{% endif %}</td>
+        <td class="z">{% if s.z is defined %}{{ '%+.1f'|format(s.z) }} sd{% else %}—{% endif %}</td>
+        <td class="n">{{ s.n }}{% if s.dropped %} <small>({{ s.dropped }} left out)</small>{% endif %}</td>
       </tr>
-      {% endif %}
     {% endfor %}
     </tbody>
-  </table>
+  </table></div>
+  {% set ex = summary.values()|selectattr('explanation')|list %}
+  {% if ex %}
+  <div class="explain">
+    <h3>What the differences mean</h3>
+    {% for s in ex %}<p>{{ s.explanation }}</p>{% endfor %}
+    <p class="who">The system measures; a coach decides whether anything should
+       change. Altering a bowling action on the strength of a cross-sectional
+       correlation is a recognised route to injury.</p>
+  </div>
+  {% endif %}
 </section>
+{% endif %}
+
+{% for k, d in done %}
+{% set r = d.result %}
+<section class="wrap block delivery" id="d{{ k }}">
+<details {% if done|length == 1 or r.warning %}open{% endif %}>
+  <summary><h3>{{ d.name }}</h3>
+    {% if r.warning and not r.checked %}<span class="chip c-low">check frames</span>{% endif %}
+    {% if r.checked %}<span class="chip c-checked">frames checked</span>{% endif %}
+  </summary>
+
+  {% if r.warning %}
+  <div class="warnbox {% if r.checked %}soft{% endif %}">{{ r.warning.text }}</div>
+  {% endif %}
+
+  <div class="frames" data-k="{{ k }}" data-lo="{{ strips[k].lo }}" data-hi="{{ strips[k].hi }}">
+    {% for e in ['bfc', 'ffc', 'release'] %}
+    {% set q = r.quality[e] %}
+    <figure class="ev {% if r.warning and e in r.warning.suspects and not r.checked %}suspect{% endif %} {% if r.events[e] != r.auto_events[e] %}moved{% endif %}" data-e="{{ e }}" data-f="{{ r.events[e] }}" data-auto="{{ r.auto_events[e] }}">
+      <img src="/frame/{{ jid }}/{{ k }}/{{ r.events[e] }}.jpg" alt="{{ event_name[e] }}, frame {{ r.events[e] }}" loading="lazy">
+      <figcaption>
+        <b>{{ event_name[e]|capitalize }}</b> {{ conf_chip(q.level, '') }}
+        <span class="fno">frame <output>{{ r.events[e] }}</output></span>
+        <span class="nudge">
+          <button type="button" data-d="-5" aria-label="5 frames earlier">−5</button>
+          <button type="button" data-d="-1" aria-label="1 frame earlier">−1</button>
+          <button type="button" data-d="1" aria-label="1 frame later">+1</button>
+          <button type="button" data-d="5" aria-label="5 frames later">+5</button>
+        </span>
+        {% if q.reasons %}<small class="why">{{ q.reasons|join('; ') }}</small>{% endif %}
+      </figcaption>
+    </figure>
+    {% endfor %}
+  </div>
+  <div class="actions" data-k="{{ k }}">
+    <button type="button" class="act" data-act="measure">Re-measure at these frames</button>
+    <button type="button" class="act ghost" data-act="confirm">These frames are right</button>
+    <button type="button" class="act ghost" data-act="reset">Back to detected</button>
+    <span class="msg" role="status"></span>
+  </div>
+  <p class="hint">Step each instant until the picture matches: back foot contact
+     is the first frame the back foot is planted, front foot contact the first
+     frame the front foot is planted, release the last frame the ball is in the
+     hand. Confirming marks every measurement as checked.</p>
+
+  <div class="table-scroll"><table>
+    <caption>Measured against Worthington (2010), twenty elite male fast bowlers.
+      Confidence is how far to trust the event frames each value is measured at.</caption>
+    <thead><tr><th>Measurement</th><th>You</th><th>Elite</th><th>Difference</th><th>Confidence</th></tr></thead>
+    <tbody>
+    {% for key, row in r.rows.items() %}
+      <tr class="{% if not row.trusted %}bad{% elif row.z is defined and row.z|abs > 1 %}flag{% endif %}">
+        <td>{{ row.label }}
+          {% if row.plausibility == 'unusual' and row.trusted %}<small class="odd">unusual even for our cohort ({{ row.cohort_mean }})</small>{% endif %}</td>
+        <td class="v">{{ '%.1f'|format(row.value) }}{{ row.unit if row.unit != '°' else '' }}</td>
+        <td>{% if row.ref_mean is defined %}{{ row.ref_mean }} ± {{ row.ref_sd }}{% else %}not published{% endif %}</td>
+        <td class="z">{% if not row.trusted %}<span class="det">looks like a detection error — check the frames</span>
+          {% elif row.z is defined %}{{ '%+.1f'|format(row.z) }} sd{% else %}—{% endif %}</td>
+        <td>{{ conf_chip(row.confidence, row.confidence_reason) }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+
+  {% if not summary %}
+  {% set ex = r.rows.values()|selectattr('explanation')|list %}
+  {% if ex %}
+  <div class="explain">
+    <h3>What the differences mean</h3>
+    {% for row in ex %}<p>{% if row.confidence == 'low' %}<em>Low confidence:</em> {% endif %}{{ row.explanation }}</p>{% endfor %}
+    <p class="who">The system measures; a coach decides whether anything should
+       change. Altering a bowling action on the strength of a cross-sectional
+       correlation is a recognised route to injury.</p>
+  </div>
+  {% endif %}
+  {% endif %}
+</details>
+</section>
+{% endfor %}
 
 <section class="defs"><div class="wrap">
-  <h2 style="margin-top:56px">What each measurement means</h2>
+  <h2 style="margin-top:40px">What each measurement means</h2>
   <dl>
 
   <div class="def"><dt>Front knee at foot contact<small>Hip–knee–ankle, the frame the front foot lands</small></dt><dd>
@@ -75,16 +164,16 @@
     <p>A straighter leg at release means the braced front leg is still acting as
        a rigid lever, converting your run-up into rotation over the top. A bent
        one means the leg absorbed that energy instead of passing it on. Elite
-       average <span class="ref">167.3°</span>. If yours is well below that, this
-       is where pace is being lost, and it is trainable.</p>
+       average <span class="ref">167.3°</span>. That is an association across
+       elite bowlers; it does not say that changing your knee angle would
+       change your pace.</p>
   </dd></div>
 
   <div class="def"><dt>Knee flexion after contact<small>How far the knee bends from contact to its lowest point</small></dt><dd>
     <p>The amount the front leg collapses under the landing load. Elite bowlers
        give way by <span class="ref">17.5°</span> on average.</p>
     <p>Some flexion is unavoidable and useful — it absorbs a landing force of
-       around six times body weight. Too much and the energy goes into the leg
-       rather than the ball.</p>
+       around six times body weight.</p>
   </dd></div>
 
   <div class="def"><dt>Knee extension before release<small>How far it straightens again, from the lowest point to release</small></dt><dd>
@@ -123,8 +212,8 @@
        accelerate.</p>
     <p>Elite average <span class="ref">9.0°</span>. This is the least reliable
        number in the report: back foot contact is detected within three frames
-       on about 60% of deliveries, against 91% for front foot contact, so treat
-       it as indicative.</p>
+       on about 60% of deliveries, against 91% for front foot contact, so it is
+       marked low confidence until you check the back foot contact frame.</p>
   </dd></div>
 
   <div class="def"><dt>Trunk lean at front foot contact<small>The upper body against vertical, front foot landing</small></dt><dd>
@@ -161,7 +250,9 @@
        stride lowers the hips, lengthens the braking phase and generally goes
        with a larger plant angle. Here it is converted from torso lengths using
        an anthropometric constant rather than from a measured height, so read it
-       as approximate.</p>
+       as approximate. It depends on back foot contact, the least reliable
+       event: an implausibly short stride almost always means that frame was
+       detected too close to front foot contact.</p>
   </dd></div>
 
   <div class="def"><dt>Release height<small>Wrist above the ground at release, as a percentage of standing height</small></dt><dd>
@@ -177,11 +268,23 @@
 </div></section>
 
 <section class="scope"><div class="wrap">
-  <h3>What this did not measure</h3>
-  <p>Front foot contact lands within three frames of a hand mark on 91% of
-     deliveries and release on 98%, so measurements at those instants carry
-     roughly one to three degrees of timing error. Back foot contact manages
-     60%, which is why trunk lean at back foot contact is the weakest row.</p>
+  <h3>How far to trust this</h3>
+  <p>Front foot contact lands within three frames of a hand mark on
+     {{ hit_rate.ffc }}% of deliveries and release on {{ hit_rate.release }}%.
+     Back foot contact manages {{ hit_rate.bfc }}%, so anything measured at it —
+     trunk lean at back foot contact and delivery stride — starts at low
+     confidence until you check its frame. MediaPipe's own joint-angle accuracy
+     has not been validated for fast bowling, so even a correctly timed angle
+     carries several degrees of error.</p>
+  <p>Every value is also compared with our own cohort of 262 deliveries from 23
+     club bowlers. A value more than three standard deviations outside it is
+     treated as a probable detection error and not compared with the elite
+     reference until the frames are checked. At cohort level the measurements
+     are validated; for a single delivery they are much weaker, which is why
+     averaging several deliveries helps.</p>
+  <p><strong>Nothing here is a coaching prescription.</strong> The explanations
+     report published associations across groups of bowlers. They do not
+     predict what would happen if you changed your action.</p>
   <p><strong>Legality is not assessed.</strong> Whether the elbow extends past
      the permitted 15° cannot be judged from a single side-on view. The elite
      reference values describe legal actions.</p>
@@ -189,6 +292,49 @@
      technique and lower-back injury — is a transverse-plane measurement and
      needs a second camera behind the bowler. Nothing here speaks to injury
      risk.</p>
-  <a class="again" href="/">Measure another delivery</a>
+  <a class="again" href="/">Measure more deliveries</a>
 </div></section>
+
+<script>
+const JID = {{ jid|tojson }};
+document.querySelectorAll('.frames').forEach(strip => {
+  const k = strip.dataset.k, lo = +strip.dataset.lo, hi = +strip.dataset.hi;
+  strip.querySelectorAll('figure.ev').forEach(fig => {
+    const img = fig.querySelector('img'), out = fig.querySelector('output');
+    fig.querySelectorAll('.nudge button').forEach(b => b.addEventListener('click', () => {
+      const f = Math.min(hi, Math.max(lo, +fig.dataset.f + +b.dataset.d));
+      fig.dataset.f = f; out.textContent = f;
+      img.src = `/frame/${JID}/${k}/${f}.jpg`;
+      img.alt = img.alt.replace(/frame \d+/, 'frame ' + f);
+      fig.classList.toggle('moved', f != +fig.dataset.auto);
+    }));
+  });
+});
+
+document.querySelectorAll('.actions').forEach(bar => {
+  const k = bar.dataset.k, msg = bar.querySelector('.msg');
+  const strip = document.querySelector(`.frames[data-k="${k}"]`);
+  bar.querySelectorAll('button.act').forEach(b => b.addEventListener('click', async () => {
+    const ev = {};
+    strip.querySelectorAll('figure.ev').forEach(f => ev[f.dataset.e] = +f.dataset.f);
+    if (b.dataset.act === 'confirm') ev.checked = true;
+    if (b.dataset.act === 'reset') ev.reset = true;
+    if (b.dataset.act !== 'reset' && !(ev.bfc < ev.ffc && ev.ffc < ev.release)) {
+      msg.textContent = 'Back foot contact must come before front foot contact, and that before release.';
+      return;
+    }
+    msg.textContent = 'Measuring…';
+    bar.querySelectorAll('button').forEach(x => x.disabled = true);
+    try {
+      const r = await (await fetch(`/events/${JID}/${k}`, {method: 'POST',
+        headers: {'Content-Type': 'application/json'}, body: JSON.stringify(ev)})).json();
+      if (r.error) throw new Error(r.error);
+      location.hash = 'd' + k; location.reload();
+    } catch (e) {
+      msg.textContent = e.message || 'Could not re-measure.';
+      bar.querySelectorAll('button').forEach(x => x.disabled = false);
+    }
+  }));
+});
+</script>
 </body></html>

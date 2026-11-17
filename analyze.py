@@ -224,14 +224,19 @@ def blocks_of(labels, want):
     return out
 
 
-def extract_events(frames, labels, prob, phases, smooth=9):
+def extract_events(frames, labels, prob, phases, smooth=9, info=None):
     """Back foot contact, front foot contact and release as frame numbers.
 
     The phases are ordered: a bfc_phase block must precede an ffc_phase block.
     Where several blocks exist, take the pair maximising summed confidence
     subject to that ordering, as extract_events.py does offline.
+
+    Pass a dict as `info` to get back what the confidence estimate needs: the
+    smoothed probabilities and how fragmented each phase was.
     """
     P = median_filter(prob, smooth)
+    if info is not None:
+        info["P"] = P
     lab = [phases[i] for i in P.argmax(axis=1)]
     bi, fi = phases.index("bfc_phase"), phases.index("ffc_phase")
     bb, fb = blocks_of(lab, "bfc_phase"), blocks_of(lab, "ffc_phase")
@@ -249,6 +254,8 @@ def extract_events(frames, labels, prob, phases, smooth=9):
     if best is None:
         return None, "back foot contact was not found before front foot contact"
     b, f = best
+    if info is not None:
+        info["n_blocks"] = {"bfc": len(bb), "ffc": len(fb), "release": len(fb)}
     # the event instant is the first frame of each block; release is the last
     # frame of the ffc block, where the ball leaves the hand
     return {"bfc": frames[b[0]], "ffc": frames[f[0]],
@@ -256,73 +263,464 @@ def extract_events(frames, labels, prob, phases, smooth=9):
 
 
 # ------------------------------------------------------------------ report
+#
+# Three safeguards sit between the geometry and the page, because a single
+# clip is a much weaker measurement than the 262-delivery cohort:
+#
+#   plausibility  every value is also scored against our own cohort. Anything
+#                 past 3 cohort sd is almost always a mis-detected event, not
+#                 an extraordinary bowler, so it is reported as such instead of
+#                 as a finding. Two or more values past 2 sd together trigger
+#                 the same warning: a coherent set of extremes is the
+#                 signature of wrong event frames.
+#   confidence    each measurement inherits the reliability of the event
+#                 frames it is computed at. Back foot contact starts low (59%
+#                 within 3 frames in validation); a fragmented phase block, an
+#                 unsure classifier edge, pose drop-out or hidden legs lower it.
+#   explanation   rule-based, citation-bound text. It says how a value differs
+#                 from the elite mean and what the published association is.
+#                 It never prescribes a change -- an association across
+#                 bowlers is not a prediction about one bowler.
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+COHORT_PATH = os.path.join(HERE, "models", "cohort_stats.json")
+
+# key, label, unit -- the order the report prints in
+MEASURES = [
+    ("front_knee_ffc", "Front knee at foot contact", "°"),
+    ("front_knee_release", "Front knee at release", "°"),
+    ("knee_flexion", "Knee flexion after contact", "°"),
+    ("knee_extension", "Knee extension before release", "°"),
+    ("plant_angle", "Plant angle", "°"),
+    ("foot_strike", "Foot strike angle", "°"),
+    ("lean_back_bfc", "Trunk lean at back foot contact", "°"),
+    ("trunk_lean_ffc", "Trunk lean at front foot contact", "°"),
+    ("trunk_lean_release", "Trunk lean at release", "°"),
+    ("arm_angle_release", "Bowling arm against the trunk", "°"),
+    ("stride_pct_height", "Delivery stride", "% height"),
+    ("release_pct_height", "Release height", "% height"),
+]
+LABEL = {k: l for k, l, _ in MEASURES}
+
+# which event frames each measurement is computed at
+EVENT_DEPS = {
+    "front_knee_ffc": ("ffc",), "plant_angle": ("ffc",),
+    "foot_strike": ("ffc",), "trunk_lean_ffc": ("ffc",),
+    "front_knee_release": ("release",), "trunk_lean_release": ("release",),
+    "arm_angle_release": ("release",), "release_pct_height": ("release",),
+    "knee_flexion": ("ffc", "release"), "knee_extension": ("ffc", "release"),
+    "lean_back_bfc": ("bfc",), "stride_pct_height": ("bfc", "ffc"),
+}
+EVENT_NAME = {"bfc": "back foot contact", "ffc": "front foot contact",
+              "release": "ball release"}
+# leave-one-bowler-out share of deliveries within 3 frames of a hand mark
+EVENT_HIT_RATE = {"bfc": 59.0, "ffc": 91.8, "release": 98.5}
+# starting confidence from those rates: 2 high, 1 moderate, 0 low
+EVENT_BASE = {"bfc": 0, "ffc": 2, "release": 2}
+LEVELS = ["low", "moderate", "high"]
+
+IMPLAUSIBLE_SD = 3.0
+UNUSUAL_SD = 2.0
+LEG_LANDMARKS = list(range(23, 33))
+
+
+def build_cohort(csv_path="measurements.csv", out_path=COHORT_PATH):
+    """Our own cohort's mean and sd per measurement, for plausibility checks.
+
+    Written to models/ so it ships with the model (the Docker image excludes
+    CSVs). Rebuild whenever measurements.csv changes.
+    """
+    import csv
+    vals, bowlers = defaultdict(list), set()
+    with open(csv_path, newline="") as fh:
+        for r in csv.DictReader(fh):
+            bowlers.add(r.get("bowler"))
+            for key, _, _ in MEASURES:
+                try:
+                    v = float(r.get(key, ""))
+                except ValueError:
+                    continue
+                if not math.isnan(v):
+                    vals[key].append(v)
+    stats = {k: {"mean": round(float(np.mean(v)), 3),
+                 "sd": round(float(np.std(v, ddof=1)), 3), "n": len(v)}
+             for k, v in vals.items() if len(v) > 2}
+    with open(out_path, "w") as fh:
+        json.dump({"source": os.path.basename(csv_path),
+                   "bowlers": len(bowlers), "stats": stats}, fh, indent=2)
+    return stats
+
+
+def load_cohort(path=COHORT_PATH):
+    try:
+        with open(path) as fh:
+            return json.load(fh)["stats"]
+    except (OSError, ValueError, KeyError):
+        return {}
+
+
+COHORT = load_cohort()
+
+
 def band(z):
     a = abs(z)
     return "typical" if a <= 1 else ("outside the usual range" if a <= 2
                                      else "well outside the usual range")
 
 
-def analyse(path, model_path="models/phase_model.joblib", height_cm=None,
-            progress=None):
+# --------------------------------------------------------------- confidence
+def event_quality(st, ev, checked=False):
+    """How far to trust each event frame on this clip.
+
+    {event: {"level": "high"|"moderate"|"low"|"checked", "reasons": [...]}}
+    """
+    frames, P, phases = st["frames"], st["P"], st["phases"]
+    out = {}
+    for e in ("bfc", "ffc", "release"):
+        f = ev.get(e)
+        if checked:
+            out[e] = {"level": "checked", "reasons": ["frame checked by you"]}
+            continue
+        if f is None or not frames:
+            out[e] = {"level": "low", "reasons": ["not detected"]}
+            continue
+        i = min(range(len(frames)), key=lambda j: abs(frames[j] - f))
+        lvl = EVENT_BASE[e]
+        reasons = []
+        if e == "bfc":
+            reasons.append(f"back foot contact is found within 3 frames on "
+                           f"only {EVENT_HIT_RATE['bfc']:.0f}% of clips")
+        if abs(frames[i] - f) > 0:
+            lvl -= 1
+            reasons.append("no pose on that exact frame")
+        lo, hi = max(0, i - 3), min(len(frames) - 1, i + 3)
+        if any(frames[j + 1] - frames[j] > 1 for j in range(lo, hi)):
+            lvl -= 1
+            reasons.append("pose dropped out around this instant")
+        vis = st["vis"].get(frames[i])
+        if vis is not None and float(np.mean(vis[LEG_LANDMARKS])) < 0.6:
+            lvl -= 1
+            reasons.append("legs poorly visible")
+        if st["auto_events"].get(e) == f:        # classifier evidence only
+            p = phases.index("bfc_phase" if e == "bfc" else "ffc_phase")
+            if float(P[i, p]) < 0.6:              # applies to its own frame
+                lvl -= 1
+                reasons.append("the classifier was unsure where the phase "
+                               + ("ends" if e == "release" else "begins"))
+            nb = st.get("n_blocks", {}).get(e, 1)
+            if nb > 1:
+                lvl -= 1
+                reasons.append(f"the phase was split into {nb} pieces")
+        out[e] = {"level": LEVELS[max(0, lvl)], "reasons": reasons}
+    return out
+
+
+def measure_confidence(key, quality):
+    deps = EVENT_DEPS.get(key, ())
+    if not deps:
+        return "moderate", ""
+    if all(quality[e]["level"] == "checked" for e in deps):
+        return "checked", "event frames checked by you"
+    worst = min(deps, key=lambda e: LEVELS.index(quality[e]["level"])
+                if quality[e]["level"] in LEVELS else 3)
+    lvl = quality[worst]["level"]
+    why = ""
+    if lvl != "high":
+        why = (f"{EVENT_NAME[worst]} uncertain: "
+               + "; ".join(quality[worst]["reasons"]))
+    return lvl, why
+
+
+# -------------------------------------------------------------- explanation
+# Only claims already made, with citations, in the project report. Nothing
+# here says what a bowler should change.
+_ASSOC = {
+    "front_knee_release":
+        "In Worthington's cohort of 20 elite bowlers, front knee angle at "
+        "release was one of four technique parameters that together explained "
+        "73.6% of the variance in release speed.",
+    "plant_angle":
+        "Worthington found that braking impulse, rather than peak force, "
+        "characterised the fastest bowlers in his cohort (r = 0.574), and that "
+        "they generated it with a larger plant angle.",
+}
+_DESCRIBE = {
+    "knee_extension":
+        "Portus et al. (2004) classify front-knee technique by this behaviour: "
+        "a knee that bends and re-extends before release is a flexor-extender, "
+        "one that bends and stays bent is a flexor.",
+    "knee_flexion":
+        "Portus et al. (2004) classify front-knee technique by how far the knee "
+        "bends after landing and whether it recovers before release.",
+    "foot_strike":
+        "This varies widely between individuals, and the reference bowlers all "
+        "wore spiked shoes indoors, so footwear and surface shift it.",
+    "stride_pct_height":
+        "Converted from torso lengths with an anthropometric constant, so it is "
+        "approximate.",
+    "release_pct_height":
+        "Measured wrist-above-ankle, so it reads roughly 10 cm low against the "
+        "laboratory definition.",
+}
+
+
+def explain(key, z):
+    """One rule-based paragraph for a measurement > 1 sd from elite, else None."""
+    if z is None or abs(z) <= 1:
+        return None
+    head = (f"Your {LABEL[key].lower()} is {abs(z):.1f} sd "
+            f"{'below' if z < 0 else 'above'} the elite mean.")
+    if key in _ASSOC:
+        return (f"{head} {_ASSOC[key]} This is an association across bowlers, "
+                "not a prediction about you.")
+    tail = _DESCRIBE.get(key, "")
+    return (f"{head} {tail} Worthington reports this as a descriptive "
+            "reference; being different from it is not by itself a fault."
+            ).replace("  ", " ")
+
+
+# ------------------------------------------------------------------ stages
+def prepare(path, model_path="models/phase_model.joblib", progress=None):
+    """Pose, features, phase probabilities and the auto-detected events.
+
+    Returns (state, error). The state lets measure_at() re-measure at
+    corrected event frames without running MediaPipe again.
+    """
     bundle = joblib.load(model_path)
     model, feats, phases, k = (bundle["model"], bundle["features"],
                                list(bundle["phases"]), bundle["k"])
 
     poses, (W, H, fps) = run_pose(path, progress=progress)
     if len(poses) < 30:
-        return {"ok": False, "error": "no person detected for long enough -- "
-                "check the bowler is fully in frame"}
+        return None, ("no person detected for long enough -- check the bowler "
+                      "is fully in frame")
 
     rows, flip = features_for(poses, W, H)
     if len(rows) < 30:
-        return {"ok": False, "error": "pose was too unstable to measure"}
+        return None, "pose was too unstable to measure"
 
     X = np.array([[r[f] for f in feats] for r in stack(rows, k)],
                  dtype=np.float32)
     prob = model.predict_proba(X)
     frames = [f for f, _, _ in rows]
-    ev, err = extract_events(frames, None, prob, phases)
+    info = {}
+    ev, err = extract_events(frames, None, prob, phases, info=info)
     if ev is None:
-        return {"ok": False, "error": err}
+        return None, err
 
-    # geometry, reusing the offline measurement code unchanged
+    byf = {f: np.array([[P[i][0], P[i][1]] for i in range(33)])
+           for f, _, P in rows}
+    st = {"frames": frames, "byf": byf, "P": info["P"], "phases": phases,
+          "n_blocks": info.get("n_blocks", {}), "fps": float(fps),
+          "W": W, "H": H, "flip": flip, "auto_events": dict(ev),
+          "poses": {f: P for f, P in poses},
+          "vis": {f: P[:, 2] for f, P in poses}}
+    return st, ""
+
+
+def measure_at(st, ev, checked=False):
+    """Every measurement, comparison and safeguard at the given event frames."""
     import measure_deliveries as md
-    byf = {}
-    for f, _, P in rows:
-        byf[f] = np.array([[P[i][0], P[i][1]] for i in range(33)])
-    m, note = md.measure_clip(byf, ev, 1.0, tol=3)
+    if not (ev["bfc"] < ev["ffc"] < ev["release"]):
+        return {"ok": False, "error": "back foot contact must come before "
+                "front foot contact, and that before release"}
+    m, note = md.measure_clip(st["byf"], ev, 1.0, tol=3)
     if m is None:
         return {"ok": False, "error": note or "could not measure the delivery"}
 
-    out = {k2: v for k2, v in m.items() if not k2.startswith("_")}
+    vals = {k2: v for k2, v in m.items() if not k2.startswith("_")}
     for src, dst in (("stride_torso", "stride_pct_height"),
                      ("release_hgt_torso", "release_pct_height")):
-        v = out.get(src)
-        out[dst] = (v * TRUNK_RATIO * 100) if v is not None and not math.isnan(v) else None
+        v = vals.get(src)
+        vals[dst] = (v * TRUNK_RATIO * 100) if v is not None and not math.isnan(v) else None
 
-    comp = {}
-    for key, (mu, sd) in REF.items():
-        v = out.get(key)
+    quality = event_quality(st, ev, checked)
+    rows, comp = {}, {}
+    for key, label, unit in MEASURES:
+        v = vals.get(key)
         if v is None or (isinstance(v, float) and math.isnan(v)):
             continue
-        z = (v - mu) / sd
-        comp[key] = {"value": round(v, 1), "ref_mean": mu, "ref_sd": sd,
-                     "z": round(z, 2), "band": band(z)}
+        row = {"label": label, "unit": unit, "value": round(v, 1)}
+        z = None
+        if key in REF:
+            mu, sd = REF[key]
+            z = (v - mu) / sd
+            row.update(ref_mean=mu, ref_sd=sd, z=round(z, 2), band=band(z))
+            comp[key] = {"value": round(v, 1), "ref_mean": mu, "ref_sd": sd,
+                         "z": round(z, 2), "band": band(z)}
+        coh = COHORT.get(key)
+        plaus = "ok"
+        if coh and coh["sd"] > 0:
+            cz = (v - coh["mean"]) / coh["sd"]
+            row.update(cohort_mean=round(coh["mean"], 1), cohort_z=round(cz, 2))
+            plaus = ("implausible" if abs(cz) > IMPLAUSIBLE_SD else
+                     "unusual" if abs(cz) > UNUSUAL_SD else "ok")
+        row["plausibility"] = plaus
+        row["confidence"], row["confidence_reason"] = measure_confidence(key, quality)
+        # an implausible value on unchecked frames is a detection question,
+        # not a finding: no coaching text is attached to it
+        trusted = checked or plaus != "implausible"
+        row["trusted"] = trusted
+        row["explanation"] = explain(key, z) if trusted else None
+        rows[key] = row
 
-    return {"ok": True, "events": ev, "fps": round(fps, 1),
-            "frames_analysed": len(rows), "direction": "R2L" if flip else "L2R",
+    return {"ok": True, "events": dict(ev), "checked": checked,
+            "auto_events": dict(st["auto_events"]),
+            "fps": round(st["fps"], 1), "frames_analysed": len(st["frames"]),
+            "direction": "R2L" if st["flip"] else "L2R",
+            "quality": quality, "rows": rows,
+            "warning": pattern_warning(rows, checked),
             "measurements": {a: (round(b, 2) if isinstance(b, float)
                                  and not math.isnan(b) else None)
-                             for a, b in out.items()},
+                             for a, b in vals.items()},
             "comparison": comp, "note": note}
+
+
+def pattern_warning(rows, checked):
+    """A coherent set of extremes usually means the event frames are wrong."""
+    bad = [k for k, r in rows.items() if r["plausibility"] == "implausible"]
+    odd = [k for k, r in rows.items() if r["plausibility"] != "ok"]
+    if not bad and len(odd) < 2:
+        return None
+    hits = defaultdict(int)
+    for k in odd:
+        for e in EVENT_DEPS.get(k, ()):
+            hits[e] += 1
+    top = max(hits.values())
+    suspects = [e for e in ("bfc", "ffc", "release") if hits.get(e) == top]
+    names = " and ".join(EVENT_NAME[e] for e in suspects)
+    listed = ", ".join(LABEL[k].lower() for k in odd)
+    lead = (f"{len(odd)} values sit far outside our own 262-delivery cohort "
+            f"({listed})." if len(odd) > 1 else
+            f"{LABEL[odd[0]]} sits far outside our own 262-delivery cohort.")
+    if checked:
+        text = (f"{lead} You have checked the frames, so "
+                f"{'these are' if len(odd) > 1 else 'it is'} reported, but "
+                "MediaPipe's joint-angle error on fast bowling has not been "
+                "validated -- treat with care.")
+    else:
+        why = ("Extremes that move together are the signature" if len(odd) > 1
+               else "A value this extreme is usually the sign")
+        text = (f"{lead} {why} of a wrongly detected event, most likely "
+                f"{names}. Check the frames below before reading anything "
+                "into these numbers.")
+    return {"flagged": odd, "implausible": bad, "suspects": suspects,
+            "text": text}
+
+
+def summarise(results):
+    """Mean and spread over several deliveries by the same bowler.
+
+    Values on unchecked frames that fail the plausibility check are left out
+    of the mean, since they are almost certainly detection errors.
+    """
+    good = [r for r in results if r.get("ok")]
+    out = {}
+    for key, label, unit in MEASURES:
+        use, dropped = [], 0
+        for r in good:
+            row = r["rows"].get(key)
+            if not row:
+                continue
+            if row["trusted"]:
+                use.append(row["value"])
+            else:
+                dropped += 1
+        if not use:
+            continue
+        mean = float(np.mean(use))
+        sd = float(np.std(use, ddof=1)) if len(use) > 1 else None
+        row = {"label": label, "unit": unit, "value": round(mean, 1),
+               "spread": round(sd, 1) if sd is not None else None,
+               "n": len(use), "dropped": dropped}
+        z = None
+        if key in REF:
+            mu, rsd = REF[key]
+            z = (mean - mu) / rsd
+            row.update(ref_mean=mu, ref_sd=rsd, z=round(z, 2), band=band(z))
+        row["explanation"] = explain(key, z)
+        out[key] = row
+    return out
+
+
+def analyse(path, model_path="models/phase_model.joblib", height_cm=None,
+            progress=None):
+    st, err = prepare(path, model_path, progress=progress)
+    if st is None:
+        return {"ok": False, "error": err}
+    return measure_at(st, st["auto_events"])
+
+
+# ----------------------------------------------------------------- frames
+EDGES = [(11, 12), (11, 13), (13, 15), (12, 14), (14, 16), (11, 23), (12, 24),
+         (23, 24), (23, 25), (25, 27), (24, 26), (26, 28), (27, 31), (28, 32),
+         (0, 11), (0, 12)]
+
+
+def grab_frames(path, st, pad=25, height=360, max_width=1280):
+    """JPEG bytes, skeleton drawn on, for every frame from pad before back foot
+    contact to pad after release -- enough to nudge any event by hand."""
+    ev = st["auto_events"]
+    lo, hi = max(0, ev["bfc"] - pad), ev["release"] + pad
+    # one crop box for the whole strip, around everywhere the bowler goes, so
+    # the feet are big enough to judge contact and frames stay comparable
+    pts = [P[:, :2] for f, P in st["poses"].items() if lo <= f <= hi]
+    box = None
+    if pts:
+        A = np.concatenate(pts)
+        (x0, y0), (x1, y1) = A.min(axis=0), A.max(axis=0)
+        cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+        hh = (y1 - y0) * 1.25
+        aspect = (st["W"] or 16) / (st["H"] or 9)
+        ww = max((x1 - x0) * 1.15, hh * 16 / 9 / aspect)
+        hh = max(hh, ww * 9 / 16 * aspect)
+        box = (max(0.0, cx - ww / 2), max(0.0, cy - hh / 2),
+               min(1.0, cx + ww / 2), min(1.0, cy + hh / 2))
+    cap = cv2.VideoCapture(path)
+    cap.set(cv2.CAP_PROP_POS_FRAMES, lo)
+    out, i = {}, lo
+    while i <= hi:
+        ok, fr = cap.read()
+        if not ok:
+            break
+        h, w = fr.shape[:2]
+        if w > max_width:                     # same scale run_pose used
+            fr = cv2.resize(fr, (max_width, int(h * max_width / w)))
+            h, w = fr.shape[:2]
+        P = st["poses"].get(i)
+        if P is not None:
+            pts = [(int(x * w), int(y * h)) for x, y, _ in P]
+            for a, b in EDGES:
+                cv2.line(fr, pts[a], pts[b], (0, 255, 255), 2, cv2.LINE_AA)
+            for (x, y), v in zip(pts, P[:, 2]):
+                cv2.circle(fr, (x, y), 4, (0, 255, 0) if v > 0.5 else (0, 0, 255),
+                           -1, cv2.LINE_AA)
+        if box:
+            fr = fr[int(box[1] * h):int(box[3] * h), int(box[0] * w):int(box[2] * w)]
+            h, w = fr.shape[:2]
+        s = height / h
+        fr = cv2.resize(fr, (int(w * s), height), interpolation=cv2.INTER_AREA)
+        ok, buf = cv2.imencode(".jpg", fr, [cv2.IMWRITE_JPEG_QUALITY, 80])
+        if ok:
+            out[i] = buf.tobytes()
+        i += 1
+    cap.release()
+    return out
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("video")
+    ap.add_argument("video", nargs="?")
     ap.add_argument("--model", default="models/phase_model.joblib")
     ap.add_argument("--json", action="store_true")
+    ap.add_argument("--build-cohort", metavar="CSV",
+                    help="rebuild models/cohort_stats.json from measurements.csv")
     a = ap.parse_args()
+    if a.build_cohort:
+        s = build_cohort(a.build_cohort)
+        print(f"wrote {COHORT_PATH}: {len(s)} measurements"); return
+    if not a.video:
+        ap.error("give a video")
     r = analyse(a.video, a.model)
     if a.json:
         print(json.dumps(r, indent=2)); return
@@ -330,12 +728,23 @@ def main():
         sys.exit("could not analyse: " + r["error"])
     print(f"\n{os.path.basename(a.video)}   {r['frames_analysed']} frames, "
           f"{r['fps']:g} fps, travelling {r['direction']}")
-    print(f"events: back foot {r['events']['bfc']}, front foot "
-          f"{r['events']['ffc']}, release {r['events']['release']}\n")
-    print(f"  {'measurement':<22}{'you':>9}{'elite':>16}{'':>6}")
-    for k2, c in r["comparison"].items():
-        print(f"  {k2:<22}{c['value']:>9.1f}{c['ref_mean']:>10.1f} +-{c['ref_sd']:>4.1f}"
-              f"   {c['z']:+.1f} sd  {c['band']}")
+    print("events: " + "   ".join(
+        f"{EVENT_NAME[e]} {r['events'][e]} ({r['quality'][e]['level']})"
+        for e in ("bfc", "ffc", "release")) + "\n")
+    print(f"  {'measurement':<34}{'you':>8}{'elite':>16}{'':>12}  confidence")
+    for k2, row in r["rows"].items():
+        if not row["trusted"]:
+            diff = "check frames"
+        elif "z" in row:
+            diff = f"{row['z']:+.1f} sd"
+        else:
+            diff = ""
+        elite = (f"{row['ref_mean']:.1f} +-{row['ref_sd']:>4.1f}"
+                 if "ref_mean" in row else "")
+        print(f"  {row['label']:<34}{row['value']:>8.1f}{elite:>16}{diff:>12}"
+              f"  {row['confidence']}")
+    if r["warning"]:
+        print("\nWARNING: " + r["warning"]["text"])
     print("\nlegality of the bowling action is NOT assessed.")
 
 

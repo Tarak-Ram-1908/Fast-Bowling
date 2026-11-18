@@ -15,9 +15,14 @@ WHAT IS MEASURED, and why each one is honest from a single side-on camera.
 Scale-free, directly comparable to Worthington:
 
   front_knee_ffc        angle at the front knee at front foot contact.
-  front_knee_release    the same at ball release. Straight = 180 deg.
-  knee_flexion          how far it bent between those instants.
-  knee_extension        how far it straightened again afterwards.
+  front_knee_release    the same at ball release. Straight = 180 deg, and a
+                        knee past straight reads above 180 as in Worthington
+                        (his range at release reaches 186.2).
+  knee_flexion          how far it bent from front foot contact to its most
+                        bent. NOT compared with Worthington: he measures from
+                        front foot FLAT, a few frames later, which this system
+                        does not detect, so ours reads several degrees higher.
+  knee_extension        how far it straightened again, most bent to release.
   plant_angle           front hip to front ankle, against the downward
                         vertical, at front foot contact. Worthington defines
                         this as a TWO-dimensional angle on a vertical plane --
@@ -29,11 +34,17 @@ Scale-free, directly comparable to Worthington:
   trunk_lean_ffc        hip midpoint to shoulder midpoint, against vertical,
   trunk_lean_release    positive leaning forward down the pitch.
   lean_back_bfc         back ankle to shoulder midpoint at back foot contact.
-  arm_angle_release     upper arm against the line of the trunk.
+  arm_angle_release     upper arm (shoulder to elbow) against the line of the
+                        trunk. Zero and sign differ from Worthington's 3D
+                        shoulder angle, so it is never compared with it.
 
 In torso lengths, because the camera has no metric scale:
 
-  stride_torso          horizontal ankle separation at front foot contact.
+  stride_torso          ankle separation along the pitch at front foot
+                        contact -- Worthington's definition (thesis 4.8.2).
+  stride_contacts_torso back foot position at back foot contact to front foot
+                        position at front foot contact. Reported, never
+                        compared: it is not what Worthington measured.
   release_hgt_torso     wrist height above the lower ankle at release.
 
 Multiply those two by the bowler's torso length in cm to get centimetres, or
@@ -75,7 +86,6 @@ L_FOOT, R_FOOT = 31, 32
 WORTHINGTON = {
     "front_knee_ffc":     (164.1, 6.1,  "deg"),
     "front_knee_release": (167.3, 18.8, "deg"),
-    "knee_flexion":       (17.5,  11.2, "deg"),
     "knee_extension":     (11.9,  7.4,  "deg"),
     "plant_angle":        (36.3,  3.9,  "deg"),
     "foot_strike":        (-8.24, 13.2, "deg"),
@@ -87,7 +97,7 @@ WORTHINGTON = {
 MEASURES = ["front_knee_ffc", "front_knee_release", "knee_flexion",
             "knee_extension", "plant_angle", "foot_strike",
             "trunk_lean_ffc", "trunk_lean_release", "lean_back_bfc",
-            "arm_angle_release", "stride_torso", "stride_ffc_sep",
+            "arm_angle_release", "stride_torso", "stride_contacts_torso",
             "release_hgt_torso"]
 
 # derived from the two torso-relative lengths, for the Worthington comparison
@@ -104,6 +114,21 @@ def joint_angle(a, b, c):
         return float("nan")
     return math.degrees(math.acos(
         max(-1.0, min(1.0, float(np.dot(v1, v2) / (n1 * n2))))))
+
+
+def knee_angle(hip, knee, ankle):
+    """Knee angle in the sagittal plane, 180 = straight, >180 = past straight.
+
+    The interior angle alone cannot exceed 180, so a hyper-extended knee would
+    fold back and read as bent -- a bias toward flexion exactly where legs are
+    near straight. Flexion moves the knee forward of the hip-ankle line (the
+    bowler faces +x after normalising), so the side of that line the knee is
+    on gives the sign.
+    """
+    inner = joint_angle(hip, knee, ankle)
+    d = ankle - hip
+    forward = float(np.dot(knee - hip, np.array([d[1], -d[0]])))
+    return inner if forward >= 0 else 360.0 - inner
 
 
 def from_vertical(v):
@@ -266,7 +291,7 @@ def measure(P, flip):
     else:
         lead, trail = (R_HIP, R_KN, R_AN, R_FOOT), (L_HIP, L_KN, L_AN, L_FOOT)
 
-    # bowling arm = the higher wrist
+    # bowling arm = the higher wrist; its upper arm is shoulder to elbow
     high = (L_SH, L_EL, L_WR) if Q[L_WR][1] <= Q[R_WR][1] else (R_SH, R_EL, R_WR)
 
     trunk = from_vertical(sh_c - hip_c)
@@ -274,7 +299,7 @@ def measure(P, flip):
 
     return {
         "torso": torso,
-        "knee": joint_angle(Q[lead[0]], Q[lead[1]], Q[lead[2]]),
+        "knee": knee_angle(Q[lead[0]], Q[lead[1]], Q[lead[2]]),
         "plant": from_down(Q[lead[2]] - Q[lead[0]]),
         "foot_strike": from_horizontal(Q[lead[3]] - Q[lead[2]]),
         "trunk": trunk,
@@ -287,7 +312,7 @@ def measure(P, flip):
         "lean_back": -from_vertical(
             sh_c - (Q[L_AN] if Q[L_AN][1] >= Q[R_AN][1] else Q[R_AN])),
         "lean_back_trail": -from_vertical(sh_c - Q[trail[2]]),
-        "arm_vs_trunk": from_vertical(Q[high[2]] - Q[high[0]]) - trunk,
+        "arm_vs_trunk": from_vertical(Q[high[1]] - Q[high[0]]) - trunk,
         "stride": abs(float(Q[lead[2]][0] - Q[trail[2]][0])) / torso,
         "lead_ankle_x": float(Q[lead[2]][0]),
         "trail_ankle_x": float(Q[trail[2]][0]),
@@ -330,18 +355,16 @@ def measure_clip(frames, ev, flip, tol):
         "trunk_lean_release": m_rel["trunk"],
         "lean_back_bfc": m_bfc["lean_back"] if m_bfc else float("nan"),
         "arm_angle_release": m_rel["arm_vs_trunk"],
-        # Worthington defines stride length as the distance between the two
-        # CONTACT POINTS: where the back foot planted at back foot contact and
-        # where the front foot plants at front foot contact. Those are different
-        # instants about 22 frames apart. Measuring the ankle separation at the
-        # front foot contact frame alone understates it by roughly 0.45 torso
-        # lengths, because by then the back foot has pushed off and swung
-        # forward. Coordinates are raw image frame, so they compare across
-        # frames. Falls back to the old definition when there is no pose at
-        # back foot contact.
-        "stride_torso": (abs(m_ffc["lead_ankle_x"] - m_bfc["trail_ankle_x"])
-                         / m_ffc["torso"]) if m_bfc else float("nan"),
-        "stride_ffc_sep": m_ffc["stride"],
+        # Worthington (thesis 4.8.2): "the distance between the ankle joint
+        # centre of each leg ... at the instant of front foot contact". One
+        # frame, both ankles. From the side only the along-pitch component is
+        # visible; the across-pitch part of a typical stride adds about 2 cm.
+        "stride_torso": m_ffc["stride"],
+        # Back foot where it planted to front foot where it planted. Longer,
+        # because by front foot contact the back foot has pushed off and
+        # moved forward. Not Worthington's definition, so never compared.
+        "stride_contacts_torso": (abs(m_ffc["lead_ankle_x"] - m_bfc["trail_ankle_x"])
+                                  / m_ffc["torso"]) if m_bfc else float("nan"),
         "release_hgt_torso": m_rel["release_hgt"],
         "_torso_ffc": m_ffc["torso"],
     }

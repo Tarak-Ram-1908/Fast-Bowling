@@ -12,7 +12,7 @@ MediaPipe gives 33 body landmarks per frame. Sixteen per-frame features are
 computed from those, then stacked across an eleven-frame window so the model can
 see motion rather than only position. A random forest labels each frame with
 the phase of the delivery it belongs to, the phase blocks give the three event
-instants â€” back foot contact, front foot contact, ball release â€” and the twelve
+instants — back foot contact, front foot contact, ball release — and the twelve
 measurements are geometry at those frames.
 
 ## Accuracy
@@ -31,9 +31,8 @@ as a missing value.
 Mean absolute timing error is 0.76 frames (6.3 ms) for ball release and 1.53
 frames (12.7 ms) for front foot contact.
 
-Two measurements reproduce laboratory values almost exactly: plant angle
-36.6Â° against the elite 36.3 Â± 3.9, and front knee at foot contact 167.8Â°
-against 164.1 Â± 6.1.
+Plant angle, measured to Worthington's own definition, reproduces the
+laboratory value almost exactly: 36.6° against the elite 36.3 ± 3.9.
 
 ## Reading a single delivery
 
@@ -59,8 +58,8 @@ so the report guards each delivery:
 
 ## What it does not do
 
-It does not assess whether the bowling action is legal â€” elbow extension past
-the permitted 15Â° cannot be judged from one side-on view. It says nothing about
+It does not assess whether the bowling action is legal — elbow extension past
+the permitted 15° cannot be judged from one side-on view. It says nothing about
 injury risk: shoulder counter-rotation, the strongest published link between
 technique and lower-back injury, is a transverse-plane measurement needing a
 second camera behind the bowler.

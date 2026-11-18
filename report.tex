@@ -55,11 +55,12 @@ On 25 bowlers and 284 usable deliveries, evaluated by leave-one-bowler-out
 cross-validation, a random forest locates ball release within 3 frames
 (25\,ms) on 98.5\% of deliveries with a mean error of 6.3\,ms, and front foot
 contact on 91.8\%. Back foot contact is substantially harder at 59.0\%, and we
-argue this reflects a property of the event rather than of the model. Nine
+argue this reflects a property of the event rather than of the model. Eight
 kinematic variables measured at the detected instants on 262 legal deliveries
-are compared with published elite reference values; plant angle agrees to
-within 0.1 standard deviations, while the remaining variables describe a
-single coherent pattern of a front leg that collapses rather than braces.
+are compared with published elite reference values, each to the reference's
+own definition; plant angle agrees to within 0.1 standard deviations, while the
+remaining variables describe a single coherent pattern of a short stride and a
+front leg that collapses rather than braces.
 
 We also report a result about evaluation itself: across seven models, the
 per-frame ranking and the event ranking disagree, and a bidirectional LSTM
@@ -464,13 +465,30 @@ a sixth of its time.
 
 \subsection{Kinematic measurement}
 
-Nine variables were computed at the detected instants on 262 legal deliveries
+Eight variables were computed at the detected instants on 262 legal deliveries
 from 23 bowlers, and compared with Worthington's elite
 values~\cite{worthington2010}. Lengths are reported as a percentage of standing
 height, obtained from torso-relative measurements using the anthropometric
 constant $0.288$ of Winter~\cite{winter1990}: the shoulder joint sits at
 $0.818H$ and the hip at $0.530H$, so the trunk spans $0.288H$. No bowler's
 height was measured.
+
+Each variable follows Worthington's definition as closely as a single sagittal
+view allows. Stride length is the distance between the two ankle joint centres
+at the instant of front foot contact, as he defines it; only the along-pitch
+component is visible, and the across-pitch part of a typical stride adds about
+2\,cm. Knee angle is signed in the sagittal plane, so a knee past straight
+reads above $180^\circ$ as in his data, whose range at release reaches
+$186.2^\circ$; an unsigned interior angle would fold such a knee back to read
+as flexed. Plant angle (hip to ankle against the downward vertical),
+foot-strike indicator (ankle to toe against the horizontal) and lean-back
+(back ankle to shoulder midpoint against the vertical) are his projected
+two-dimensional angles directly. One variable is measured but \emph{not}
+compared: Worthington takes knee flexion from \emph{front foot flat}, the
+instant the whole foot is down, which this system does not detect. Measured
+from front foot contact instead, flexion reads several degrees higher---a
+heuristic estimate of foot flat puts the difference at a median of $5.6^\circ$
+across our deliveries---so a comparison would overstate it.
 
 \input{report/tables/measurements}
 
@@ -492,15 +510,17 @@ the elite one-standard-deviation band. Both matter: a shifted mean alone cannot
 distinguish a whole group that differs from a handful of outliers dragging an
 otherwise typical cohort.
 
-These are not nine independent findings. Read together they describe one
-mechanism. A stride 1.56 standard deviations shorter than elite leaves the
-front leg less braced, so the knee flexes more ($+0.89$) and extends less
-($-1.19$), and remains more flexed at release ($-1.27$). Release height is also
-lower on average ($-1.09$), though Section~\ref{sec:universal} shows this
-particular variable varies too widely between bowlers to be treated as a group
-property. Reduced backward trunk lean at back foot contact ($-1.09$) is
-the same pattern one step earlier. \textbf{The front leg collapses rather than
-bracing}---the expected difference between club and professional bowlers.
+These are not eight independent findings. Read together they describe one
+mechanism. Stride is the largest difference in the study: 3.09 standard
+deviations shorter than elite, with not one of our 262 deliveries inside the
+elite one-standard-deviation band. A short stride leaves the front leg less
+braced, so the knee extends less after landing ($-1.16$) and remains more
+flexed at release ($-1.23$). Release height is also lower on average ($-1.07$),
+though Section~\ref{sec:universal} shows this particular variable varies too
+widely between bowlers to be treated as a group property. Reduced backward
+trunk lean at back foot contact ($-1.07$) is the same pattern one step earlier.
+\textbf{The front leg collapses rather than bracing}---the expected difference
+between club and professional bowlers.
 
 Foot strike angle ($+1.16$) does not belong to that pattern and is the one
 result we cannot currently explain. Footwear is a plausible confounder: the
@@ -529,31 +549,34 @@ showing every bowler's mean deviation on every variable.
 
 The columns separate sharply into three kinds.
 
-\textbf{Two variables are universal.} Knee extension is below the elite mean
-for \emph{all 23 bowlers} (range $-1.58$ to $-0.47$), and stride is below for
-all 23 (range $-3.02$ to $-0.17$). Not one bowler is an exception. These are
-properties of the cohort, and the group means genuinely describe every
+\textbf{Stride is universal.} It is below the elite mean for \emph{all 23
+bowlers} (range $-4.25$ to $-1.90$). Not one bowler is an exception, and even
+the longest-striding bowler sits almost two elite standard deviations short.
+This is a property of the cohort, and the group mean genuinely describes every
 individual in it.
 
-\textbf{Front knee angle at release is near-universal}, below the elite mean
-for 20 of 23 bowlers---and the three exceptions are informative rather than
-noise. They are Hemanth ($+0.41$), Charan ($+0.35$) and Junior4 ($+0.50$):
-precisely three of the four bowlers independently classified as
-\emph{constant brace} in Section~\ref{sec:technique}. The same pattern appears
-on knee flexion, where all four exceptions to the group tendency---Hemanth,
-SriMani, Charan and Junior4---are exactly the four constant-brace bowlers.
+\textbf{Knee extension and front knee angle at release are near-universal},
+and their exceptions are informative rather than noise. Knee extension is below
+the elite mean for 22 of 23 bowlers (range $-1.58$ to $+0.71$); the one
+exception is Hemanth, the only bowler classified as an \emph{extender} in
+Section~\ref{sec:technique}. Front knee angle at release is below the elite mean
+for 20 of 23; the exceptions are Hemanth ($+0.90$), Charan ($+0.35$) and Junior4
+($+0.80$), three of the four bowlers the Portus classification independently
+places outside the flexor class.
 
-This is the strongest internal evidence in the study. The continuous kinematic
-measurement and the discrete Portus classification are computed from different
-quantities, and they identify the same four individuals as behaving
-differently. Agreement between two independent analyses at the level of named
-individuals is a much stronger check than agreement between two group means.
+The second of these is the stronger internal evidence. The knee angle at the
+release instant and the Portus class, which is computed from the \emph{change}
+in knee angle across the contact phase, are different quantities, and they
+pick out the same individuals as behaving differently. Agreement between two
+analyses at the level of named bowlers is a much stronger check than agreement
+between two group means. The knee-extension exception is weaker evidence,
+since extension feeds the classification directly.
 
-\textbf{Four variables are mixed and must not be reported as group findings.}
-Front knee angle at front foot contact spans $-2.95$ to $+2.17$ with 17 bowlers
-above the elite mean and 6 below; plant angle is almost evenly split, as
-expected for the variable we use as a validation anchor; and release height
-spans $-3.95$ to $+2.95$. For these, the group mean is an average over a
+\textbf{Three variables are mixed and must not be reported as group findings.}
+Front knee angle at front foot contact spans $-3.08$ to $+3.43$ with 17 bowlers
+above the elite mean and 6 below; plant angle is evenly split, 12 above and 11
+below, as expected for the variable we use as a validation anchor; and release
+height spans $-3.95$ to $+2.95$. For these, the group mean is an average over a
 genuinely heterogeneous cohort and describes no particular bowler.
 
 Release height deserves specific caution. A spread of nearly seven elite
@@ -581,9 +604,9 @@ which variables that bowler departs from the reference on, and by how much.
 
 Applying the classification of Portus et al.---a $10^\circ$ threshold on
 flexion and on extension between FFC and release---19 of 23 bowlers (82.6\%)
-are flexors against 59.5\% in the elite cohort, and \textbf{no bowler in our
-sample classifies as an extender or flexor-extender} against 19\% combined in
-theirs.
+are flexors against 59.5\% in the elite cohort. \textbf{One bowler in our
+sample classifies as an extender and none as a flexor-extender}, 4.3\% combined
+against 19\% in theirs, and three (13.0\%) are constant brace against 21.4\%.
 
 \input{report/tables/technique_per_bowler}
 
@@ -592,12 +615,21 @@ deliveries falling in their modal class. A bowler below roughly 70\% is not
 reliably one class, and for them the group classification is a summary rather
 than a description.
 
-This corroborates the measurement result independently, and does so at two
-levels. At the group level, a cohort in which no bowler extends the front knee
-(knee extension is below elite for all 23) cannot produce extender classes. At
-the individual level, the four constant-brace bowlers are exactly the four who
-depart from the group tendency on knee flexion and knee angle at release, as
-Section~\ref{sec:universal} shows. Two readings remain open.
+This corroborates the measurement result at two levels. At the group level, a
+cohort in which knee extension is below elite for 22 of 23 bowlers produces
+almost no extender classes, and the single extender is the single exception.
+At the individual level, the four bowlers outside the flexor class---Charan,
+SriMani and Junior4 as constant brace, Hemanth as extender---include all three
+who depart from the group tendency on knee angle at release, as
+Section~\ref{sec:universal} shows.
+
+Hemanth's class should be read with care. His knee reads past straight at
+release ($184^\circ$ on average), and in a single 2D view a nearly straight leg
+is where landmark placement decides whether the knee sits a few pixels in
+front of the hip--ankle line or behind it. Worthington observed the same
+combination in his own cohort---the bowlers with the least flexion had the most
+hyper-extended knees at release---so the reading is plausible, but it is the
+measurement most exposed to pose error. Two readings remain open.
 Either club bowlers genuinely do not brace and extend as professionals do, or
 our measurement systematically compresses extension. We cannot distinguish them
 with the present data, and prefer to say so.
@@ -635,7 +667,10 @@ contributes roughly $\pm 2$--$3$ percentage points of individual error. Release
 is detected at the wrist rather than the ball, biasing release height
 approximately 10\,cm low; the per-bowler spread on that variable
 (Section~\ref{sec:universal}) suggests it is also the least reliable of the
-nine, and we draw no conclusion from it. The sample is 25 club bowlers from one institute,
+eight, and we draw no conclusion from it. Knee flexion is not compared with the
+elite value because front foot flat is not detected; detecting it from the heel
+and toe landmarks would restore the comparison but would first need hand marks
+to validate against. The sample is 25 club bowlers from one institute,
 with no injury outcomes.
 
 \section{Conclusion}

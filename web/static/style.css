@@ -191,3 +191,4 @@ td.n small{color:var(--chalk-dim)}
   table{font-size:.9rem}
   th,td{padding:9px 6px}
 }
+td .nc{color:var(--chalk-dim);font-size:.85rem}

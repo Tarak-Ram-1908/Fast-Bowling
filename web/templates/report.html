@@ -46,7 +46,7 @@
         <td>{{ s.label }}</td>
         <td class="v">{{ '%.1f'|format(s.value) }}{{ s.unit if s.unit != '°' else '' }}
           {% if s.spread is not none %}<small class="pm">± {{ '%.1f'|format(s.spread) }}</small>{% endif %}</td>
-        <td>{% if s.ref_mean is defined %}{{ s.ref_mean }} ± {{ s.ref_sd }}{% else %}not published{% endif %}</td>
+        <td>{% if s.ref_mean is defined %}{{ s.ref_mean }} ± {{ s.ref_sd }}{% else %}<span class="nc">{{ s.ref_note }}</span>{% endif %}</td>
         <td class="z">{% if s.z is defined %}{{ '%+.1f'|format(s.z) }} sd{% else %}—{% endif %}</td>
         <td class="n">{{ s.n }}{% if s.dropped %} <small>({{ s.dropped }} left out)</small>{% endif %}</td>
       </tr>
@@ -119,7 +119,7 @@
         <td>{{ row.label }}
           {% if row.plausibility == 'unusual' and row.trusted %}<small class="odd">unusual even for our cohort ({{ row.cohort_mean }})</small>{% endif %}</td>
         <td class="v">{{ '%.1f'|format(row.value) }}{{ row.unit if row.unit != '°' else '' }}</td>
-        <td>{% if row.ref_mean is defined %}{{ row.ref_mean }} ± {{ row.ref_sd }}{% else %}not published{% endif %}</td>
+        <td>{% if row.ref_mean is defined %}{{ row.ref_mean }} ± {{ row.ref_sd }}{% else %}<span class="nc">{{ row.ref_note }}</span>{% endif %}</td>
         <td class="z">{% if not row.trusted %}<span class="det">looks like a detection error — check the frames</span>
           {% elif row.z is defined %}{{ '%+.1f'|format(row.z) }} sd{% else %}—{% endif %}</td>
         <td>{{ conf_chip(row.confidence, row.confidence_reason) }}</td>
@@ -150,7 +150,8 @@
 
   <div class="def"><dt>Front knee at foot contact<small>Hip–knee–ankle, the frame the front foot lands</small></dt><dd>
     <p>How straight the front leg is at the instant it hits the ground. 180° is
-       dead straight. This is the position everything that follows is braced
+       dead straight; a knee pushed past straight reads above 180°, as in the
+       laboratory data. This is the position everything that follows is braced
        from — the leg either holds this shape or folds.</p>
     <p>Elite bowlers average <span class="ref">164.1°</span>, so slightly bent,
        not locked. A very straight leg at contact is not the goal in itself;
@@ -170,10 +171,14 @@
   </dd></div>
 
   <div class="def"><dt>Knee flexion after contact<small>How far the knee bends from contact to its lowest point</small></dt><dd>
-    <p>The amount the front leg collapses under the landing load. Elite bowlers
-       give way by <span class="ref">17.5°</span> on average.</p>
+    <p>The amount the front leg collapses under the landing load, measured
+       here from the instant the foot lands to the knee's most bent point.</p>
     <p>Some flexion is unavoidable and useful — it absorbs a landing force of
        around six times body weight.</p>
+    <p>Worthington's elite figure of 17.5° is measured from <em>front foot
+       flat</em> — when the whole foot is down, a few frames after it lands —
+       which this system does not detect. Measuring from landing reads several
+       degrees higher, so the number is not compared with his.</p>
   </dd></div>
 
   <div class="def"><dt>Knee extension before release<small>How far it straightens again, from the lowest point to release</small></dt><dd>
@@ -192,8 +197,8 @@
     <p>Worthington found that braking impulse, not peak force, is what
        characterises the fastest bowlers (<span class="ref">r = 0.574</span>),
        and that they generate it through a larger plant angle. Elite average
-       <span class="ref">36.3°</span>. This is one of the two measurements this
-       system reproduces almost exactly against laboratory values.</p>
+       <span class="ref">36.3°</span>. This is the measurement this system
+       reproduces most closely against laboratory values.</p>
   </dd></div>
 
   <div class="def"><dt>Foot strike angle<small>The front foot against horizontal as it lands</small></dt><dd>
@@ -233,26 +238,26 @@
        reference exists for the standalone angle at release.</p>
   </dd></div>
 
-  <div class="def"><dt>Bowling arm against the trunk<small>The bowling arm relative to the line of the trunk at release</small></dt><dd>
+  <div class="def"><dt>Bowling arm against the trunk<small>The upper arm, shoulder to elbow, relative to the line of the trunk at release</small></dt><dd>
     <p>Where the arm is when the ball goes, measured against the trunk rather
        than against vertical.</p>
     <p>Worthington found something counter-intuitive: his fastest bowlers had
        the arm further <em>behind</em> the line of the trunk at release, not
        further in front as earlier studies had reported. He attributes the
        disagreement to those studies measuring against the vertical instead.
-       No reference distribution is published, so this is reported unanchored.</p>
+       His angle is a three-dimensional shoulder angle with a different zero,
+       so this upper-arm-against-trunk angle is reported unanchored.</p>
   </dd></div>
 
-  <div class="def"><dt>Delivery stride<small>Back foot contact point to front foot contact point, as a percentage of standing height</small></dt><dd>
-    <p>The length of the final stride, measured between the two contact points
-       and scaled by height so tall and short bowlers can be compared.</p>
+  <div class="def"><dt>Delivery stride<small>Ankle to ankle at front foot contact, as a percentage of standing height</small></dt><dd>
+    <p>The length of the final stride: the distance between the two ankles at
+       the instant the front foot lands, which is how Worthington measures it,
+       scaled by height so tall and short bowlers can be compared.</p>
     <p>Elite average <span class="ref">78.5%</span> of standing height. A longer
        stride lowers the hips, lengthens the braking phase and generally goes
        with a larger plant angle. Here it is converted from torso lengths using
        an anthropometric constant rather than from a measured height, so read it
-       as approximate. It depends on back foot contact, the least reliable
-       event: an implausibly short stride almost always means that frame was
-       detected too close to front foot contact.</p>
+       as approximate.</p>
   </dd></div>
 
   <div class="def"><dt>Release height<small>Wrist above the ground at release, as a percentage of standing height</small></dt><dd>
@@ -271,9 +276,9 @@
   <h3>How far to trust this</h3>
   <p>Front foot contact lands within three frames of a hand mark on
      {{ hit_rate.ffc }}% of deliveries and release on {{ hit_rate.release }}%.
-     Back foot contact manages {{ hit_rate.bfc }}%, so anything measured at it —
-     trunk lean at back foot contact and delivery stride — starts at low
-     confidence until you check its frame. MediaPipe's own joint-angle accuracy
+     Back foot contact manages {{ hit_rate.bfc }}%, so trunk lean at back foot
+     contact, the one value measured there, starts at low confidence until you
+     check its frame. MediaPipe's own joint-angle accuracy
      has not been validated for fast bowling, so even a correctly timed angle
      carries several degrees of error.</p>
   <p>Every value is also compared with our own cohort of 262 deliveries from 23

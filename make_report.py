@@ -77,7 +77,7 @@ EVENTS = [("release", "Ball release"), ("ffc", "Front-foot contact"),
 
 # Worthington (2010), elite fast bowlers: (mean, sd)
 REF = {"front_knee_ffc": (164.1, 6.1), "front_knee_release": (167.3, 18.8),
-       "knee_flexion": (17.5, 11.2), "knee_extension": (11.9, 7.4),
+       "knee_extension": (11.9, 7.4),
        "plant_angle": (36.3, 3.9), "foot_strike": (-8.2, 13.2),
        "lean_back_bfc": (9.0, 5.2), "stride_pct_height": (78.5, 7.2),
        "release_pct_height": (112.8, 4.1)}

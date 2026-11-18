@@ -52,13 +52,17 @@ FEATURE_NAMES = ["knee_lead","knee_trail","elbow_high","elbow_low",
 REF = {
     "front_knee_ffc":     (164.1, 6.1),
     "front_knee_release": (167.3, 18.8),
-    "knee_flexion":       (17.5, 11.2),
     "knee_extension":     (11.9, 7.4),
     "plant_angle":        (36.3, 3.9),
     "foot_strike":        (-8.2, 13.2),
     "lean_back_bfc":      (9.0, 5.2),
     "stride_pct_height":  (78.5, 7.2),
     "release_pct_height": (112.8, 4.1),
+}
+# Measured here, but not comparable with Worthington, and why.
+NOT_COMPARABLE = {
+    "knee_flexion": "elite measured from foot flat",
+    "arm_angle_release": "elite uses a 3D shoulder angle",
 }
 TRUNK_RATIO = 0.288          # Winter (1990), shoulder 0.818H - hip 0.530H
 
@@ -309,7 +313,7 @@ EVENT_DEPS = {
     "front_knee_release": ("release",), "trunk_lean_release": ("release",),
     "arm_angle_release": ("release",), "release_pct_height": ("release",),
     "knee_flexion": ("ffc", "release"), "knee_extension": ("ffc", "release"),
-    "lean_back_bfc": ("bfc",), "stride_pct_height": ("bfc", "ffc"),
+    "lean_back_bfc": ("bfc",), "stride_pct_height": ("ffc",),
 }
 EVENT_NAME = {"bfc": "back foot contact", "ffc": "front foot contact",
               "release": "ball release"}
@@ -449,15 +453,13 @@ _DESCRIBE = {
         "Portus et al. (2004) classify front-knee technique by this behaviour: "
         "a knee that bends and re-extends before release is a flexor-extender, "
         "one that bends and stays bent is a flexor.",
-    "knee_flexion":
-        "Portus et al. (2004) classify front-knee technique by how far the knee "
-        "bends after landing and whether it recovers before release.",
     "foot_strike":
         "This varies widely between individuals, and the reference bowlers all "
         "wore spiked shoes indoors, so footwear and surface shift it.",
     "stride_pct_height":
-        "Converted from torso lengths with an anthropometric constant, so it is "
-        "approximate.",
+        "Measured as Worthington does, ankle to ankle at front foot contact, "
+        "and converted from torso lengths with an anthropometric constant, so "
+        "it is approximate.",
     "release_pct_height":
         "Measured wrist-above-ankle, so it reads roughly 10 cm low against the "
         "laboratory definition.",
@@ -540,7 +542,8 @@ def measure_at(st, ev, checked=False):
         v = vals.get(key)
         if v is None or (isinstance(v, float) and math.isnan(v)):
             continue
-        row = {"label": label, "unit": unit, "value": round(v, 1)}
+        row = {"label": label, "unit": unit, "value": round(v, 1),
+               "ref_note": NOT_COMPARABLE.get(key, "not published")}
         z = None
         if key in REF:
             mu, sd = REF[key]
@@ -632,7 +635,8 @@ def summarise(results):
         sd = float(np.std(use, ddof=1)) if len(use) > 1 else None
         row = {"label": label, "unit": unit, "value": round(mean, 1),
                "spread": round(sd, 1) if sd is not None else None,
-               "n": len(use), "dropped": dropped}
+               "n": len(use), "dropped": dropped,
+               "ref_note": NOT_COMPARABLE.get(key, "not published")}
         z = None
         if key in REF:
             mu, rsd = REF[key]

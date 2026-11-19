@@ -1,0 +1,14 @@
+/* Additions for the browser version; style.css is copied from web/static. */
+.hero{background-image:none}
+.lede.private{color:var(--chalk);font-weight:600;margin-top:-.2rem}
+.privacy #loadstate{display:block;margin-top:6px;color:var(--gold)}
+.ev canvas,.focus canvas{display:block;width:100%;height:auto;background:#000}
+.ev canvas{aspect-ratio:16/9;object-fit:contain}
+button.again{background:none;border:0;padding:0;margin-top:30px;color:var(--gold);
+  font:600 1rem "Source Sans 3",sans-serif;text-transform:none;letter-spacing:0;
+  text-decoration:underline;text-underline-offset:.2em}
+button.again:hover{background:none;color:#ffc94d}
+.foot{border-top:1px solid var(--rule);padding:22px 0 34px;color:var(--chalk-dim);font-size:.9rem}
+/* canvases report their pixel width as their minimum; let grid cells shrink */
+.frames > *,.focusgrid > *{min-width:0}
+@media (max-width:760px){.frames{grid-template-columns:minmax(0,1fr)}}

@@ -1,0 +1,512 @@
+{
+ "features": [
+  "knee_lead",
+  "knee_trail",
+  "elbow_high",
+  "elbow_low",
+  "ankle_sep_x",
+  "ankle_diff_y",
+  "low_ankle_y",
+  "high_ankle_y",
+  "trunk_lean",
+  "arm_high_elev",
+  "arm_low_elev",
+  "wrist_high_vs_head",
+  "shoulder_width",
+  "hip_width",
+  "shoulder_hip_offset",
+  "lead_ankle_fwd",
+  "knee_lead__m5",
+  "knee_lead__m4",
+  "knee_lead__m3",
+  "knee_lead__m2",
+  "knee_lead__m1",
+  "knee_lead__p1",
+  "knee_lead__p2",
+  "knee_lead__p3",
+  "knee_lead__p4",
+  "knee_lead__p5",
+  "knee_lead__d1",
+  "knee_lead__d3",
+  "knee_lead__v",
+  "knee_trail__m5",
+  "knee_trail__m4",
+  "knee_trail__m3",
+  "knee_trail__m2",
+  "knee_trail__m1",
+  "knee_trail__p1",
+  "knee_trail__p2",
+  "knee_trail__p3",
+  "knee_trail__p4",
+  "knee_trail__p5",
+  "knee_trail__d1",
+  "knee_trail__d3",
+  "knee_trail__v",
+  "elbow_high__m5",
+  "elbow_high__m4",
+  "elbow_high__m3",
+  "elbow_high__m2",
+  "elbow_high__m1",
+  "elbow_high__p1",
+  "elbow_high__p2",
+  "elbow_high__p3",
+  "elbow_high__p4",
+  "elbow_high__p5",
+  "elbow_high__d1",
+  "elbow_high__d3",
+  "elbow_high__v",
+  "elbow_low__m5",
+  "elbow_low__m4",
+  "elbow_low__m3",
+  "elbow_low__m2",
+  "elbow_low__m1",
+  "elbow_low__p1",
+  "elbow_low__p2",
+  "elbow_low__p3",
+  "elbow_low__p4",
+  "elbow_low__p5",
+  "elbow_low__d1",
+  "elbow_low__d3",
+  "elbow_low__v",
+  "ankle_sep_x__m5",
+  "ankle_sep_x__m4",
+  "ankle_sep_x__m3",
+  "ankle_sep_x__m2",
+  "ankle_sep_x__m1",
+  "ankle_sep_x__p1",
+  "ankle_sep_x__p2",
+  "ankle_sep_x__p3",
+  "ankle_sep_x__p4",
+  "ankle_sep_x__p5",
+  "ankle_sep_x__d1",
+  "ankle_sep_x__d3",
+  "ankle_sep_x__v",
+  "ankle_diff_y__m5",
+  "ankle_diff_y__m4",
+  "ankle_diff_y__m3",
+  "ankle_diff_y__m2",
+  "ankle_diff_y__m1",
+  "ankle_diff_y__p1",
+  "ankle_diff_y__p2",
+  "ankle_diff_y__p3",
+  "ankle_diff_y__p4",
+  "ankle_diff_y__p5",
+  "ankle_diff_y__d1",
+  "ankle_diff_y__d3",
+  "ankle_diff_y__v",
+  "low_ankle_y__m5",
+  "low_ankle_y__m4",
+  "low_ankle_y__m3",
+  "low_ankle_y__m2",
+  "low_ankle_y__m1",
+  "low_ankle_y__p1",
+  "low_ankle_y__p2",
+  "low_ankle_y__p3",
+  "low_ankle_y__p4",
+  "low_ankle_y__p5",
+  "low_ankle_y__d1",
+  "low_ankle_y__d3",
+  "low_ankle_y__v",
+  "high_ankle_y__m5",
+  "high_ankle_y__m4",
+  "high_ankle_y__m3",
+  "high_ankle_y__m2",
+  "high_ankle_y__m1",
+  "high_ankle_y__p1",
+  "high_ankle_y__p2",
+  "high_ankle_y__p3",
+  "high_ankle_y__p4",
+  "high_ankle_y__p5",
+  "high_ankle_y__d1",
+  "high_ankle_y__d3",
+  "high_ankle_y__v",
+  "trunk_lean__m5",
+  "trunk_lean__m4",
+  "trunk_lean__m3",
+  "trunk_lean__m2",
+  "trunk_lean__m1",
+  "trunk_lean__p1",
+  "trunk_lean__p2",
+  "trunk_lean__p3",
+  "trunk_lean__p4",
+  "trunk_lean__p5",
+  "trunk_lean__d1",
+  "trunk_lean__d3",
+  "trunk_lean__v",
+  "arm_high_elev__m5",
+  "arm_high_elev__m4",
+  "arm_high_elev__m3",
+  "arm_high_elev__m2",
+  "arm_high_elev__m1",
+  "arm_high_elev__p1",
+  "arm_high_elev__p2",
+  "arm_high_elev__p3",
+  "arm_high_elev__p4",
+  "arm_high_elev__p5",
+  "arm_high_elev__d1",
+  "arm_high_elev__d3",
+  "arm_high_elev__v",
+  "arm_low_elev__m5",
+  "arm_low_elev__m4",
+  "arm_low_elev__m3",
+  "arm_low_elev__m2",
+  "arm_low_elev__m1",
+  "arm_low_elev__p1",
+  "arm_low_elev__p2",
+  "arm_low_elev__p3",
+  "arm_low_elev__p4",
+  "arm_low_elev__p5",
+  "arm_low_elev__d1",
+  "arm_low_elev__d3",
+  "arm_low_elev__v",
+  "wrist_high_vs_head__m5",
+  "wrist_high_vs_head__m4",
+  "wrist_high_vs_head__m3",
+  "wrist_high_vs_head__m2",
+  "wrist_high_vs_head__m1",
+  "wrist_high_vs_head__p1",
+  "wrist_high_vs_head__p2",
+  "wrist_high_vs_head__p3",
+  "wrist_high_vs_head__p4",
+  "wrist_high_vs_head__p5",
+  "wrist_high_vs_head__d1",
+  "wrist_high_vs_head__d3",
+  "wrist_high_vs_head__v",
+  "shoulder_width__m5",
+  "shoulder_width__m4",
+  "shoulder_width__m3",
+  "shoulder_width__m2",
+  "shoulder_width__m1",
+  "shoulder_width__p1",
+  "shoulder_width__p2",
+  "shoulder_width__p3",
+  "shoulder_width__p4",
+  "shoulder_width__p5",
+  "shoulder_width__d1",
+  "shoulder_width__d3",
+  "shoulder_width__v",
+  "hip_width__m5",
+  "hip_width__m4",
+  "hip_width__m3",
+  "hip_width__m2",
+  "hip_width__m1",
+  "hip_width__p1",
+  "hip_width__p2",
+  "hip_width__p3",
+  "hip_width__p4",
+  "hip_width__p5",
+  "hip_width__d1",
+  "hip_width__d3",
+  "hip_width__v",
+  "shoulder_hip_offset__m5",
+  "shoulder_hip_offset__m4",
+  "shoulder_hip_offset__m3",
+  "shoulder_hip_offset__m2",
+  "shoulder_hip_offset__m1",
+  "shoulder_hip_offset__p1",
+  "shoulder_hip_offset__p2",
+  "shoulder_hip_offset__p3",
+  "shoulder_hip_offset__p4",
+  "shoulder_hip_offset__p5",
+  "shoulder_hip_offset__d1",
+  "shoulder_hip_offset__d3",
+  "shoulder_hip_offset__v",
+  "lead_ankle_fwd__m5",
+  "lead_ankle_fwd__m4",
+  "lead_ankle_fwd__m3",
+  "lead_ankle_fwd__m2",
+  "lead_ankle_fwd__m1",
+  "lead_ankle_fwd__p1",
+  "lead_ankle_fwd__p2",
+  "lead_ankle_fwd__p3",
+  "lead_ankle_fwd__p4",
+  "lead_ankle_fwd__p5",
+  "lead_ankle_fwd__d1",
+  "lead_ankle_fwd__d3",
+  "lead_ankle_fwd__v"
+ ],
+ "base_features": [
+  "knee_lead",
+  "knee_trail",
+  "elbow_high",
+  "elbow_low",
+  "ankle_sep_x",
+  "ankle_diff_y",
+  "low_ankle_y",
+  "high_ankle_y",
+  "trunk_lean",
+  "arm_high_elev",
+  "arm_low_elev",
+  "wrist_high_vs_head",
+  "shoulder_width",
+  "hip_width",
+  "shoulder_hip_offset",
+  "lead_ankle_fwd"
+ ],
+ "phases": [
+  "bfc_phase",
+  "ffc_phase",
+  "follow_through",
+  "none",
+  "run_up"
+ ],
+ "model_classes": [
+  "bfc_phase",
+  "ffc_phase",
+  "follow_through",
+  "none",
+  "run_up"
+ ],
+ "k": 5,
+ "smooth": 9,
+ "ref": {
+  "front_knee_ffc": [
+   164.1,
+   6.1
+  ],
+  "front_knee_release": [
+   167.3,
+   18.8
+  ],
+  "knee_extension": [
+   11.9,
+   7.4
+  ],
+  "plant_angle": [
+   36.3,
+   3.9
+  ],
+  "foot_strike": [
+   -8.2,
+   13.2
+  ],
+  "lean_back_bfc": [
+   9.0,
+   5.2
+  ],
+  "stride_pct_height": [
+   78.5,
+   7.2
+  ],
+  "release_pct_height": [
+   112.8,
+   4.1
+  ]
+ },
+ "not_comparable": {
+  "knee_flexion": "elite measured from foot flat",
+  "arm_angle_release": "elite uses a 3D shoulder angle"
+ },
+ "cohort": {
+  "front_knee_ffc": {
+   "mean": 169.121,
+   "sd": 10.108,
+   "n": 262
+  },
+  "front_knee_release": {
+   "mean": 144.091,
+   "sd": 18.97,
+   "n": 262
+  },
+  "knee_flexion": {
+   "mean": 28.342,
+   "sd": 15.059,
+   "n": 262
+  },
+  "knee_extension": {
+   "mean": 3.311,
+   "sd": 5.417,
+   "n": 262
+  },
+  "plant_angle": {
+   "mean": 36.556,
+   "sd": 4.59,
+   "n": 262
+  },
+  "foot_strike": {
+   "mean": 7.112,
+   "sd": 13.381,
+   "n": 262
+  },
+  "lean_back_bfc": {
+   "mean": 3.433,
+   "sd": 5.688,
+   "n": 261
+  },
+  "trunk_lean_ffc": {
+   "mean": 7.785,
+   "sd": 6.58,
+   "n": 262
+  },
+  "trunk_lean_release": {
+   "mean": 30.359,
+   "sd": 9.169,
+   "n": 262
+  },
+  "arm_angle_release": {
+   "mean": -13.745,
+   "sd": 13.924,
+   "n": 262
+  },
+  "stride_pct_height": {
+   "mean": 56.245,
+   "sd": 5.471,
+   "n": 262
+  },
+  "release_pct_height": {
+   "mean": 108.398,
+   "sd": 10.178,
+   "n": 262
+  }
+ },
+ "trunk_ratio": 0.288,
+ "measures": [
+  [
+   "front_knee_ffc",
+   "Front knee at foot contact",
+   "°"
+  ],
+  [
+   "front_knee_release",
+   "Front knee at release",
+   "°"
+  ],
+  [
+   "knee_flexion",
+   "Knee flexion after contact",
+   "°"
+  ],
+  [
+   "knee_extension",
+   "Knee extension before release",
+   "°"
+  ],
+  [
+   "plant_angle",
+   "Plant angle",
+   "°"
+  ],
+  [
+   "foot_strike",
+   "Foot strike angle",
+   "°"
+  ],
+  [
+   "lean_back_bfc",
+   "Trunk lean at back foot contact",
+   "°"
+  ],
+  [
+   "trunk_lean_ffc",
+   "Trunk lean at front foot contact",
+   "°"
+  ],
+  [
+   "trunk_lean_release",
+   "Trunk lean at release",
+   "°"
+  ],
+  [
+   "arm_angle_release",
+   "Bowling arm against the trunk",
+   "°"
+  ],
+  [
+   "stride_pct_height",
+   "Delivery stride",
+   "% height"
+  ],
+  [
+   "release_pct_height",
+   "Release height",
+   "% height"
+  ]
+ ],
+ "event_deps": {
+  "front_knee_ffc": [
+   "ffc"
+  ],
+  "plant_angle": [
+   "ffc"
+  ],
+  "foot_strike": [
+   "ffc"
+  ],
+  "trunk_lean_ffc": [
+   "ffc"
+  ],
+  "front_knee_release": [
+   "release"
+  ],
+  "trunk_lean_release": [
+   "release"
+  ],
+  "arm_angle_release": [
+   "release"
+  ],
+  "release_pct_height": [
+   "release"
+  ],
+  "knee_flexion": [
+   "ffc",
+   "release"
+  ],
+  "knee_extension": [
+   "ffc",
+   "release"
+  ],
+  "lean_back_bfc": [
+   "bfc"
+  ],
+  "stride_pct_height": [
+   "ffc"
+  ]
+ },
+ "event_name": {
+  "bfc": "back foot contact",
+  "ffc": "front foot contact",
+  "release": "ball release"
+ },
+ "event_hit_rate": {
+  "bfc": 59.0,
+  "ffc": 91.8,
+  "release": 98.5
+ },
+ "event_base": {
+  "bfc": 0,
+  "ffc": 2,
+  "release": 2
+ },
+ "assoc": {
+  "front_knee_release": "In Worthington's cohort of 20 elite bowlers, front knee angle at release was one of four technique parameters that together explained 73.6% of the variance in release speed.",
+  "plant_angle": "Worthington found that braking impulse, rather than peak force, characterised the fastest bowlers in his cohort (r = 0.574), and that they generated it with a larger plant angle."
+ },
+ "describe": {
+  "knee_extension": "Portus et al. (2004) classify front-knee technique by this behaviour: a knee that bends and re-extends before release is a flexor-extender, one that bends and stays bent is a flexor.",
+  "foot_strike": "This varies widely between individuals, and the reference bowlers all wore spiked shoes indoors, so footwear and surface shift it.",
+  "stride_pct_height": "Measured as Worthington does, ankle to ankle at front foot contact, and converted from torso lengths with an anthropometric constant, so it is approximate.",
+  "release_pct_height": "Measured wrist-above-ankle, so it reads roughly 10 cm low against the laboratory definition."
+ },
+ "focus_at": {
+  "front_knee_ffc": "ffc",
+  "plant_angle": "ffc",
+  "foot_strike": "ffc",
+  "stride_pct_height": "ffc",
+  "front_knee_release": "rel",
+  "knee_extension": "rel",
+  "release_pct_height": "rel",
+  "lean_back_bfc": "bfc"
+ },
+ "focus_text": {
+  "front_knee_ffc": "The front leg the instant it lands. Red is your hip, knee and ankle; dashed green is where the shin would sit at the elite average knee angle.",
+  "front_knee_release": "The front leg as the ball leaves the hand. Red is your hip, knee and ankle; dashed green is the shin at the elite average knee angle.",
+  "knee_extension": "The front knee at release. After its most bent point the elite knee straightens by about 12 degrees before release; this shows how far yours had come back.",
+  "plant_angle": "The front leg as it lands. Red runs hip to ankle; dashed green is the elite average angle from vertical.",
+  "foot_strike": "The front foot as it lands. Red runs ankle to toe; dashed green is the elite average foot angle.",
+  "lean_back_bfc": "The instant the back foot lands. Red runs from the back ankle to the shoulders; dashed green is the elite average lean.",
+  "stride_pct_height": "Both feet at front foot contact. Red is the distance between your ankles; dashed green is the elite average stride scaled to your body.",
+  "release_pct_height": "The release instant. Red is your wrist height above the ground; the green mark is the elite average release height scaled to your body."
+ },
+ "implausible_sd": 3.0,
+ "unusual_sd": 2.0
+}

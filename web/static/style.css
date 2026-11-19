@@ -206,3 +206,5 @@ td .nc{color:var(--chalk-dim);font-size:.85rem}
 .focus .fz em{color:#E0606F;font-style:normal}
 .focus small{color:var(--chalk-dim);font-size:.86rem;line-height:1.45}
 @media (max-width:760px){.focusgrid{grid-template-columns:1fr}}
+
+.privacy{color:var(--chalk-dim);font-size:.9rem;margin-top:18px;max-width:620px}

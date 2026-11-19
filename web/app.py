@@ -5,16 +5,18 @@ Delivery Stride -- upload side-on videos, get the front-leg numbers back.
     py -3.13 web/app.py
     open http://127.0.0.1:5000
 
-Analysis runs in a worker thread so the page can show progress; MediaPipe takes
-roughly 20-40 s on a 3-second 4K clip. Jobs live in memory and vanish on
-restart, which is the right scope for a demo.
+Analysis runs on ONE worker thread fed by a queue, so many visitors at once
+wait their turn instead of each starting a MediaPipe graph and starving the
+CPU; the page shows their place in line. MediaPipe takes roughly 20-40 s on a
+3-second 4K clip. Jobs live in memory, are only reachable through their
+unguessable link, and are deleted JOB_TTL seconds after they finish.
 
 A job is one or more deliveries. Each keeps the pose state and a strip of
 frames around the detected events, so the report can show the frames the
 system chose and the user can nudge them and re-measure without re-running
 MediaPipe. With several deliveries the report leads with their mean.
 """
-import os, sys, threading, uuid, traceback
+import os, sys, threading, uuid, traceback, time, queue
 from flask import (Flask, request, jsonify, render_template, abort, Response)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -27,13 +29,65 @@ os.makedirs(UPLOADS, exist_ok=True)
 MODEL = os.path.join(ROOT, "models", "phase_model.joblib")
 
 app = Flask(__name__)
-app.config["MAX_CONTENT_LENGTH"] = 1200 * 1024 * 1024
+app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024
 app.config["TEMPLATES_AUTO_RELOAD"] = True          # pick up template edits
 app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0          # never cache static files
 ASSET_V = str(int(os.path.getmtime(os.path.join(HERE, "static", "style.css"))))
 JOBS = {}
 OK_EXT = {".mp4", ".mov", ".m4v", ".avi"}
-MAX_FILES = 12
+MAX_FILES = 6           # deliveries per upload
+MAX_SECONDS = 12        # per clip; one delivery needs 3-5 s
+MAX_WAITING = 15        # uploads queued before new ones are turned away
+JOB_TTL = 60 * 60       # results kept this long after they finish
+MAX_JOBS = 40           # and never more than this many in memory
+WORK = queue.Queue()
+WAITING = []            # job ids in queue order, for "N ahead of you"
+LOCK = threading.Lock()
+
+
+def purge():
+    """Drop finished jobs past their lifetime, and the oldest beyond MAX_JOBS."""
+    now = time.time()
+    with LOCK:
+        done = sorted((j.get("finished", now), jid) for jid, j in JOBS.items()
+                      if j["state"] in ("done", "failed"))
+        for fin, jid in done:
+            if now - fin > JOB_TTL:
+                JOBS.pop(jid, None)
+        extra = len(JOBS) - MAX_JOBS
+        for fin, jid in done:
+            if extra <= 0:
+                break
+            if jid in JOBS:
+                JOBS.pop(jid); extra -= 1
+
+
+def worker():
+    while True:
+        jid, items = WORK.get()
+        with LOCK:
+            if jid in WAITING:
+                WAITING.remove(jid)
+        if jid in JOBS:
+            JOBS[jid]["state"] = "running"
+            work(jid, items)
+            JOBS[jid]["finished"] = time.time()
+        else:                                   # expired while queued
+            for _, path in items:
+                try: os.remove(path)
+                except OSError: pass
+        WORK.task_done()
+
+
+def clip_seconds(path):
+    import cv2
+    cap = cv2.VideoCapture(path)
+    if not cap.isOpened():
+        return None
+    n = cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0
+    fps = cap.get(cv2.CAP_PROP_FPS) or 0
+    cap.release()
+    return n / fps if fps > 0 else None
 
 
 def work(job_id, items):
@@ -90,18 +144,39 @@ def start():
                                  "will not open. Use MP4 or MOV."), 400
     if not os.path.exists(MODEL):
         return jsonify(error="The model is missing. Run train_production.py."), 503
+    purge()
+    if len(WAITING) >= MAX_WAITING:
+        return jsonify(error="The site is busy right now. Try again in a few "
+                             "minutes."), 503
 
-    jid = uuid.uuid4().hex[:12]
+    jid = uuid.uuid4().hex                # the link is the only key to it
     items = []
+
+    def discard():
+        for _, pth in items:
+            try: os.remove(pth)
+            except OSError: pass
+
     for k, f in enumerate(files):
         path = os.path.join(UPLOADS, f"{jid}_{k}"
                             + os.path.splitext(f.filename)[1].lower())
         f.save(path)
         items.append((f.filename, path))
-    JOBS[jid] = {"state": "running", "progress": 2, "stage": "Opening the files",
+        secs = clip_seconds(path)
+        if secs is None:
+            discard()
+            return jsonify(error=f"{f.filename} could not be read as a video."), 400
+        if secs > MAX_SECONDS:
+            discard()
+            return jsonify(error=f"{f.filename} is {secs:.0f} s long. Trim it to "
+                                 f"one delivery, under {MAX_SECONDS} s."), 400
+    JOBS[jid] = {"state": "queued", "progress": 1, "stage": "Waiting",
+                 "created": time.time(),
                  "deliveries": [{"name": nm, "state": "queued"}
                                 for nm, _ in items]}
-    threading.Thread(target=work, args=(jid, items), daemon=True).start()
+    with LOCK:
+        WAITING.append(jid)
+    WORK.put((jid, items))
     return jsonify(job=jid)
 
 
@@ -110,8 +185,17 @@ def progress(jid):
     j = JOBS.get(jid)
     if not j:
         return jsonify(error="unknown job"), 404
-    return jsonify(state=j["state"], progress=j["progress"],
-                   stage=j.get("stage", ""), error=j.get("error"))
+    stage = j.get("stage", "")
+    if j["state"] == "queued":
+        with LOCK:
+            ahead = WAITING.index(jid) if jid in WAITING else 0
+        if any(x["state"] == "running" for x in list(JOBS.values())):
+            ahead += 1                   # the one being analysed now
+        stage = ("Starting" if ahead == 0 else
+                 f"Waiting for {ahead} analysis ahead of yours" if ahead == 1
+                 else f"Waiting for {ahead} analyses ahead of yours")
+    return jsonify(state="running" if j["state"] == "queued" else j["state"],
+                   progress=j["progress"], stage=stage, error=j.get("error"))
 
 
 def delivery(jid, k):
@@ -202,6 +286,9 @@ def report(jid):
                            done_map={k: d for k, d in done},
                            event_name=analyze.EVENT_NAME,
                            hit_rate=analyze.EVENT_HIT_RATE, v=ASSET_V)
+
+
+threading.Thread(target=worker, daemon=True).start()
 
 
 if __name__ == "__main__":

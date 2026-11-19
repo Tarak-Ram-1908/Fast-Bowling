@@ -54,6 +54,11 @@
     <input type="file" name="video" id="video" multiple accept="video/mp4,video/quicktime,.mp4,.mov,.m4v">
     <button type="submit" id="go" {% if not model_ready %}disabled{% endif %}>Measure it</button>
   </form>
+  <p class="privacy">Up to {{ max_files }} clips of up to 12 seconds each.
+     Your videos are deleted as soon as they have been analysed. The results,
+     including still frames, stay on the server for an hour, reachable only
+     through the private link of your report, and are then deleted. Do not
+     upload video of anyone who has not agreed to it.</p>
   <div class="bar" id="bar"><i id="fill"></i></div>
   <p class="stage" id="stage"></p>
   <p class="err" id="err"></p>

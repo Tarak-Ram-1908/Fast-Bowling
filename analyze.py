@@ -565,6 +565,8 @@ def measure_at(st, ev, checked=False):
         trusted = checked or plaus != "implausible"
         row["trusted"] = trusted
         row["explanation"] = explain(key, z) if trusted else None
+        fk = FOCUS_AT.get(key)
+        row["focus_frame"] = m.get(f"_f_{fk}") if fk else None
         rows[key] = row
 
     return {"ok": True, "events": dict(ev), "checked": checked,
@@ -573,10 +575,20 @@ def measure_at(st, ev, checked=False):
             "direction": "R2L" if st["flip"] else "L2R",
             "quality": quality, "rows": rows,
             "warning": pattern_warning(rows, checked),
+            "focus": focus_list(rows),
             "measurements": {a: (round(b, 2) if isinstance(b, float)
                                  and not math.isnan(b) else None)
                              for a, b in vals.items()},
             "comparison": comp, "note": note}
+
+
+def focus_list(rows):
+    """Values to show on their own frame: more than 1 sd from the elite mean,
+    on frames that passed the plausibility check, furthest from elite first."""
+    keys = [k for k, r in rows.items()
+            if r.get("z") is not None and abs(r["z"]) > 1 and r["trusted"]
+            and r.get("focus_frame") is not None]
+    return sorted(keys, key=lambda k: -abs(rows[k]["z"]))
 
 
 def pattern_warning(rows, checked):
@@ -661,15 +673,17 @@ EDGES = [(11, 12), (11, 13), (13, 15), (12, 14), (14, 16), (11, 23), (12, 24),
          (0, 11), (0, 12)]
 
 
-def grab_frames(path, st, pad=25, height=360, max_width=1280):
-    """JPEG bytes, skeleton drawn on, for every frame from pad before back foot
-    contact to pad after release -- enough to nudge any event by hand."""
+def grab_frames(path, st, pad=25, height=420, max_width=1280):
+    """Plain JPEG crops for every frame from pad before back foot contact to
+    pad after release -- enough to nudge any event by hand. Drawing happens on
+    request (render_frame, render_focus); st["crop"] records how a landmark
+    maps onto these crops."""
     ev = st["auto_events"]
     lo, hi = max(0, ev["bfc"] - pad), ev["release"] + pad
     # one crop box for the whole strip, around everywhere the bowler goes, so
     # the feet are big enough to judge contact and frames stay comparable
     pts = [P[:, :2] for f, P in st["poses"].items() if lo <= f <= hi]
-    box = None
+    box = (0.0, 0.0, 1.0, 1.0)
     if pts:
         A = np.concatenate(pts)
         (x0, y0), (x1, y1) = A.min(axis=0), A.max(axis=0)
@@ -691,25 +705,220 @@ def grab_frames(path, st, pad=25, height=360, max_width=1280):
         if w > max_width:                     # same scale run_pose used
             fr = cv2.resize(fr, (max_width, int(h * max_width / w)))
             h, w = fr.shape[:2]
-        P = st["poses"].get(i)
-        if P is not None:
-            pts = [(int(x * w), int(y * h)) for x, y, _ in P]
-            for a, b in EDGES:
-                cv2.line(fr, pts[a], pts[b], (0, 255, 255), 2, cv2.LINE_AA)
-            for (x, y), v in zip(pts, P[:, 2]):
-                cv2.circle(fr, (x, y), 4, (0, 255, 0) if v > 0.5 else (0, 0, 255),
-                           -1, cv2.LINE_AA)
-        if box:
-            fr = fr[int(box[1] * h):int(box[3] * h), int(box[0] * w):int(box[2] * w)]
-            h, w = fr.shape[:2]
-        s = height / h
-        fr = cv2.resize(fr, (int(w * s), height), interpolation=cv2.INTER_AREA)
-        ok, buf = cv2.imencode(".jpg", fr, [cv2.IMWRITE_JPEG_QUALITY, 80])
+        cx0, cy0 = int(box[0] * w), int(box[1] * h)
+        fr = fr[cy0:int(box[3] * h), cx0:int(box[2] * w)]
+        s = height / fr.shape[0]
+        st["crop"] = {"w": w, "h": h, "x0": cx0, "y0": cy0, "s": s}
+        fr = cv2.resize(fr, (int(fr.shape[1] * s), height),
+                        interpolation=cv2.INTER_AREA)
+        ok, buf = cv2.imencode(".jpg", fr, [cv2.IMWRITE_JPEG_QUALITY, 85])
         if ok:
             out[i] = buf.tobytes()
         i += 1
     cap.release()
     return out
+
+
+def _pixels(st, f):
+    """Landmarks of frame f as pixel positions on the stored crop, or None."""
+    P, c = st["poses"].get(f), st.get("crop")
+    if P is None or c is None:
+        return None
+    return np.array([((x * c["w"] - c["x0"]) * c["s"],
+                      (y * c["h"] - c["y0"]) * c["s"]) for x, y, _ in P])
+
+
+def _decode(jpg):
+    return cv2.imdecode(np.frombuffer(jpg, np.uint8), cv2.IMREAD_COLOR)
+
+
+def _encode(img):
+    ok, buf = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 85])
+    return buf.tobytes() if ok else b""
+
+
+def _pt(p):
+    return (int(round(p[0])), int(round(p[1])))
+
+
+def _skeleton(img, st, f, faint=False):
+    X = _pixels(st, f)
+    if X is None:
+        return
+    P = st["poses"][f]
+    col = (170, 170, 170) if faint else (0, 255, 255)
+    for a, b in EDGES:
+        cv2.line(img, _pt(X[a]), _pt(X[b]), col, 1 if faint else 2, cv2.LINE_AA)
+    if not faint:
+        for p, v in zip(X, P[:, 2]):
+            cv2.circle(img, _pt(p), 3, (0, 255, 0) if v > 0.5 else (0, 0, 255),
+                       -1, cv2.LINE_AA)
+
+
+def render_frame(st, jpg, f):
+    """A stored crop with the skeleton drawn on."""
+    img = _decode(jpg)
+    _skeleton(img, st, f)
+    return _encode(img)
+
+
+# which measured frame each drawable value comes from
+FOCUS_AT = {"front_knee_ffc": "ffc", "plant_angle": "ffc", "foot_strike": "ffc",
+            "stride_pct_height": "ffc", "front_knee_release": "rel",
+            "knee_extension": "rel", "release_pct_height": "rel",
+            "lean_back_bfc": "bfc"}
+YOU, ELITE, GUIDE = (60, 70, 255), (90, 220, 120), (200, 200, 200)   # BGR
+FOCUS_TEXT = {
+    "front_knee_ffc": "The front leg the instant it lands. Red is your hip, "
+        "knee and ankle; dashed green is where the shin would sit at the elite "
+        "average knee angle.",
+    "front_knee_release": "The front leg as the ball leaves the hand. Red is "
+        "your hip, knee and ankle; dashed green is the shin at the elite "
+        "average knee angle.",
+    "knee_extension": "The front knee at release. After its most bent point "
+        "the elite knee straightens by about 12 degrees before release; this "
+        "shows how far yours had come back.",
+    "plant_angle": "The front leg as it lands. Red runs hip to ankle; dashed "
+        "green is the elite average angle from vertical.",
+    "foot_strike": "The front foot as it lands. Red runs ankle to toe; dashed "
+        "green is the elite average foot angle.",
+    "lean_back_bfc": "The instant the back foot lands. Red runs from the back "
+        "ankle to the shoulders; dashed green is the elite average lean.",
+    "stride_pct_height": "Both feet at front foot contact. Red is the distance "
+        "between your ankles; dashed green is the elite average stride scaled "
+        "to your body.",
+    "release_pct_height": "The release instant. Red is your wrist height above "
+        "the ground; the green mark is the elite average release height "
+        "scaled to your body.",
+}
+
+
+_DRAWN = []
+
+
+def _dashed(img, p, q, col, th=2, dash=9):
+    p, q = np.asarray(p, float), np.asarray(q, float)
+    _DRAWN.extend([p, q])
+    n = max(1, int(np.linalg.norm(q - p) / dash))
+    for k in range(0, n, 2):
+        a, b = p + (q - p) * k / n, p + (q - p) * min(k + 1, n) / n
+        cv2.line(img, _pt(a), _pt(b), col, th, cv2.LINE_AA)
+
+
+def _seg(img, p, q, col, th=3):
+    _DRAWN.extend([np.asarray(p, float), np.asarray(q, float)])
+    cv2.line(img, _pt(p), _pt(q), col, th, cv2.LINE_AA)
+
+
+def _rot(v, deg):
+    r = math.radians(deg)
+    return np.array([v[0] * math.cos(r) - v[1] * math.sin(r),
+                     v[0] * math.sin(r) + v[1] * math.cos(r)])
+
+
+def render_focus(st, jpg, f, key, row):
+    """The frame a measurement was taken at: the measured segments in red, and
+    where the elite average would put them dashed in green."""
+    import measure_deliveries as md
+    img = _decode(jpg)
+    X = _pixels(st, f)
+    if X is None:
+        return _encode(img)
+    _skeleton(img, st, f, faint=True)
+    _DRAWN.clear()
+    d = -1.0 if st["flip"] else 1.0                 # +1 = travelling right
+
+    def B(p):                                       # pixel <-> bowler frame
+        return np.array([p[0] * d, p[1]])
+
+    lead_l = X[md.L_AN][0] * d >= X[md.R_AN][0] * d
+    hip, kn, an, toe = ((md.L_HIP, md.L_KN, md.L_AN, md.L_FOOT) if lead_l else
+                        (md.R_HIP, md.R_KN, md.R_AN, md.R_FOOT))
+    back_an = md.R_AN if lead_l else md.L_AN
+    ref = row.get("ref_mean")
+
+    if key in ("front_knee_ffc", "front_knee_release", "knee_extension"):
+        H, K, A = X[hip], X[kn], X[an]
+        _seg(img, H, K, YOU)
+        _seg(img, K, A, YOU)
+        if key != "knee_extension":
+            # keep the thigh, swing the shank about the knee to the elite angle
+            cur = md.knee_angle(B(H), B(K), B(A))
+            best = None
+            for sgn in (1, -1):
+                cand = K + _rot(A - K, sgn * (ref - cur))
+                err = abs(md.knee_angle(B(H), B(K), B(cand)) - ref)
+                if best is None or err < best[0]:
+                    best = (err, cand)
+            _dashed(img, K, best[1], ELITE)
+        cv2.circle(img, _pt(K), 8, YOU, 2, cv2.LINE_AA)
+    elif key == "plant_angle":
+        H, A = X[hip], X[an]
+        L = float(np.linalg.norm(A - H))
+        _dashed(img, H, H + [0, L], GUIDE, 1)
+        _seg(img, H, A, YOU)
+        r = math.radians(ref)
+        _dashed(img, H, H + B(np.array([math.sin(r), math.cos(r)]) * L), ELITE)
+    elif key == "foot_strike":
+        A, T = X[an], X[toe]
+        L = max(float(np.linalg.norm(T - A)) * 1.8, 30.0)
+        _dashed(img, A, A + B(np.array([L, 0.0])), GUIDE, 1)
+        _seg(img, A, A + (T - A) / max(np.linalg.norm(T - A), 1e-6) * L, YOU)
+        r = math.radians(ref)
+        _dashed(img, A, A + B(np.array([math.cos(r), -math.sin(r)]) * L), ELITE)
+    elif key == "lean_back_bfc":
+        A = X[md.L_AN] if X[md.L_AN][1] >= X[md.R_AN][1] else X[md.R_AN]
+        S = (X[md.L_SH] + X[md.R_SH]) / 2
+        L = float(np.linalg.norm(S - A))
+        _dashed(img, A, A - [0, L], GUIDE, 1)
+        _seg(img, A, S, YOU)
+        r = math.radians(ref)
+        _dashed(img, A, A + B(np.array([-math.sin(r), -math.cos(r)]) * L), ELITE)
+    elif key == "stride_pct_height":
+        F, K = X[an], X[back_an]
+        y = max(F[1], K[1]) + 14
+        _seg(img, (K[0], y), (F[0], y), YOU)
+        for p in (K, F):
+            _dashed(img, p, (p[0], y), YOU, 1)
+        span = (F[0] - K[0]) * ref / row["value"]
+        _dashed(img, (K[0], y + 12), (K[0] + span, y + 12), ELITE, 3)
+    elif key == "release_pct_height":
+        W = X[md.L_WR] if X[md.L_WR][1] <= X[md.R_WR][1] else X[md.R_WR]
+        g = max(X[md.L_AN][1], X[md.R_AN][1])
+        _seg(img, (W[0], g), W, YOU)
+        top = g - (g - W[1]) * ref / row["value"]
+        _dashed(img, (W[0] + 12, g), (W[0] + 12, top), ELITE)
+        cv2.line(img, _pt((W[0] + 4, top)), _pt((W[0] + 20, top)), ELITE, 2,
+                 cv2.LINE_AA)
+
+    # crop to the bowler and the overlays, 4:3, then scale up
+    A = np.vstack([X] + ([np.array(_DRAWN)] if _DRAWN else []))
+    (x0, y0), (x1, y1) = A.min(axis=0), A.max(axis=0)
+    m = 0.12 * max(x1 - x0, y1 - y0)
+    x0, y0, x1, y1 = x0 - m, y0 - m, x1 + m, y1 + m
+    cw, ch = x1 - x0, y1 - y0
+    if cw / ch < 4 / 3:
+        x0 -= (ch * 4 / 3 - cw) / 2; cw = ch * 4 / 3
+    else:
+        y0 -= (cw * 3 / 4 - ch) / 2; ch = cw * 3 / 4
+    H0, W0 = img.shape[:2]
+    xa, ya = int(max(0, x0)), int(max(0, y0))
+    xb, yb = int(min(W0, x0 + cw)), int(min(H0, y0 + ch))
+    if xb - xa > 20 and yb - ya > 20:
+        img = img[ya:yb, xa:xb]
+        sc = 480 / img.shape[0]
+        img = cv2.resize(img, (int(img.shape[1] * sc), 480),
+                         interpolation=cv2.INTER_CUBIC)
+    h, w = img.shape[:2]
+    cv2.rectangle(img, (0, h - 34), (w, h), (0, 0, 0), -1)
+    cv2.putText(img, f"frame {f}", (10, h - 12), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
+                (230, 230, 230), 1, cv2.LINE_AA)
+    cv2.putText(img, "you", (w - 112, h - 12), cv2.FONT_HERSHEY_SIMPLEX, 0.55,
+                YOU, 2, cv2.LINE_AA)
+    if key != "knee_extension":
+        cv2.putText(img, "elite", (w - 64, h - 12), cv2.FONT_HERSHEY_SIMPLEX,
+                    0.55, ELITE, 2, cv2.LINE_AA)
+    return _encode(img)
 
 
 def main():

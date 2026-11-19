@@ -12,6 +12,19 @@
   <span class="mark">Delivery <b>Stride</b></span>
 </div></header>
 
+{% macro focus_card(jid, k, key, row, label_suffix='') -%}
+  <figure class="focus">
+    <img src="/focus/{{ jid }}/{{ k }}/{{ key }}.jpg" alt="{{ row.label }} drawn on the frame it was measured at" loading="lazy">
+    <figcaption>
+      <b>{{ row.label }}</b>
+      <span class="fz">{{ '%.1f'|format(row.value) }}{{ '%' if row.unit != '°' else '°' }}
+        against elite {{ row.ref_mean }} ± {{ row.ref_sd }}
+        <em>({{ '%+.1f'|format(row.z) }} sd)</em></span>
+      <small>{{ focus_text[key] }}{{ label_suffix }}</small>
+    </figcaption>
+  </figure>
+{%- endmacro %}
+
 {% macro conf_chip(level, why) -%}
   <span class="chip c-{{ level }}" {% if why %}title="{{ why }}"{% endif %}>{{ level }}</span>
 {%- endmacro %}
@@ -53,6 +66,20 @@
     {% endfor %}
     </tbody>
   </table></div>
+  {% if sfocus %}
+  <div class="focusbox">
+    <h3>Where your action differs most from elite</h3>
+    <p class="hint">Each value more than one elite standard deviation from the
+       average, drawn on the frame it was measured at. The example is the
+       delivery closest to your own average.</p>
+    <div class="focusgrid">
+    {% for key, k in sfocus %}
+      {% set row = done_map[k].result.rows[key] %}
+      {{ focus_card(jid, k, key, summary[key], ' Drawn on ' ~ done_map[k].name ~ ', which measured ' ~ ('%.1f'|format(row.value)) ~ '.') }}
+    {% endfor %}
+    </div>
+  </div>
+  {% endif %}
   {% set ex = summary.values()|selectattr('explanation')|list %}
   {% if ex %}
   <div class="explain">
@@ -77,6 +104,19 @@
 
   {% if r.warning %}
   <div class="warnbox {% if r.checked %}soft{% endif %}">{{ r.warning.text }}</div>
+  {% endif %}
+
+  {% if r.focus %}
+  <div class="focusbox">
+    <h3>Where {% if summary %}this delivery{% else %}your action{% endif %} differs most from elite</h3>
+    <p class="hint">Each value more than one elite standard deviation from the
+       average, drawn on the frame it was measured at, furthest first.
+       {% if r.warning and not r.checked %}Check the frames below first: some
+       values on this delivery look like detection errors.{% endif %}</p>
+    <div class="focusgrid">
+    {% for key in r.focus %}{{ focus_card(jid, k, key, r.rows[key]) }}{% endfor %}
+    </div>
+  </div>
   {% endif %}
 
   <div class="frames" data-k="{{ k }}" data-lo="{{ strips[k].lo }}" data-hi="{{ strips[k].hi }}">

@@ -40,6 +40,9 @@ The numbers above are validated for the cohort. One clip is a much weaker
 measurement, mostly because back foot contact is right only 59% of the time,
 so the report guards each delivery:
 
+- **Differences are shown on the body.** Every value more than 1 sd from the
+  elite mean is drawn on the frame it was measured at: the measured segments
+  in red, and where the elite average would put them dashed in green.
 - **The chosen frames are shown.** Each event frame is drawn with its skeleton
   and can be stepped ±1 or ±5 frames and re-measured, or confirmed as right.
 - **Plausibility check.** Every value is also scored against our own 262

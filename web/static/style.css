@@ -192,3 +192,17 @@ td.n small{color:var(--chalk-dim)}
   th,td{padding:9px 6px}
 }
 td .nc{color:var(--chalk-dim);font-size:.85rem}
+
+/* ---------- where the action differs ---------- */
+.focusbox{margin:26px 0 8px}
+.focusbox h3{margin-bottom:.3rem}
+.focusgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
+  gap:16px;margin-top:14px}
+.focus{margin:0;background:rgba(13,59,46,.3);border:1px solid var(--rule)}
+.focus img{display:block;width:100%;height:auto;background:#000}
+.focus figcaption{padding:10px 12px 14px;display:flex;flex-direction:column;gap:4px}
+.focus b{font-family:Oswald,sans-serif;font-weight:500;font-size:1.1rem}
+.focus .fz{color:var(--chalk);font-variant-numeric:tabular-nums}
+.focus .fz em{color:#E0606F;font-style:normal}
+.focus small{color:var(--chalk-dim);font-size:.86rem;line-height:1.45}
+@media (max-width:760px){.focusgrid{grid-template-columns:1fr}}

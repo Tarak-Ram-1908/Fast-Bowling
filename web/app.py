@@ -130,8 +130,23 @@ def frame(jid, k, n):
     b = d["thumbs"].get(n)
     if b is None:
         abort(404)
-    return Response(b, mimetype="image/jpeg",
+    return Response(analyze.render_frame(d["st"], b, n), mimetype="image/jpeg",
                     headers={"Cache-Control": "private, max-age=3600"})
+
+
+@app.get("/focus/<jid>/<int:k>/<key>.jpg")
+def focus(jid, k, key):
+    """The frame one measurement was taken at, drawn against the elite."""
+    _, d = delivery(jid, k)
+    row = d["result"]["rows"].get(key)
+    if not row or row.get("focus_frame") is None:
+        abort(404)
+    f = row["focus_frame"]
+    b = d["thumbs"].get(f)
+    if b is None:
+        abort(404)
+    return Response(analyze.render_focus(d["st"], b, f, key, row),
+                    mimetype="image/jpeg", headers={"Cache-Control": "no-store"})
 
 
 @app.post("/events/<jid>/<int:k>")
@@ -167,8 +182,24 @@ def report(jid):
                if len(done) > 1 else None)
     strips = {k: {"lo": min(d["thumbs"]), "hi": max(d["thumbs"])}
               for k, d in done}
+    # for the averaged view, show each value far from elite on the delivery
+    # whose own value is closest to the bowler's mean -- a typical example
+    sfocus = []
+    if summary:
+        for key, srow in sorted(summary.items(),
+                                key=lambda kv: -abs(kv[1].get("z") or 0)):
+            if srow.get("z") is None or abs(srow["z"]) <= 1:
+                continue
+            cands = [(abs(d["result"]["rows"][key]["value"] - srow["value"]), k)
+                     for k, d in done if key in d["result"]["rows"]
+                     and d["result"]["rows"][key]["trusted"]
+                     and d["result"]["rows"][key].get("focus_frame") is not None]
+            if cands:
+                sfocus.append((key, min(cands)[1]))
     return render_template("report.html", jid=jid, done=done, failed=failed,
-                           summary=summary, strips=strips,
+                           summary=summary, strips=strips, sfocus=sfocus,
+                           focus_text=analyze.FOCUS_TEXT,
+                           done_map={k: d for k, d in done},
                            event_name=analyze.EVENT_NAME,
                            hit_rate=analyze.EVENT_HIT_RATE, v=ASSET_V)
 

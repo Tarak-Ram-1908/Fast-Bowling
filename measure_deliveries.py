@@ -341,8 +341,8 @@ def measure_clip(frames, ev, flip, tol):
         if f_ffc <= f <= f_rel:
             mm = measure(frames[f], flip)
             if mm and not math.isnan(mm["knee"]):
-                knees.append(mm["knee"])
-    knee_min = min(knees) if knees else float("nan")
+                knees.append((mm["knee"], f))
+    knee_min, f_min = min(knees) if knees else (float("nan"), None)
 
     out = {
         "front_knee_ffc": m_ffc["knee"],
@@ -367,6 +367,8 @@ def measure_clip(frames, ev, flip, tol):
                                   / m_ffc["torso"]) if m_bfc else float("nan"),
         "release_hgt_torso": m_rel["release_hgt"],
         "_torso_ffc": m_ffc["torso"],
+        # the frames actually measured, for drawing them
+        "_f_bfc": f_bfc, "_f_ffc": f_ffc, "_f_rel": f_rel, "_f_min": f_min,
     }
     note = "" if m_bfc else "no pose at back foot contact"
     return out, note

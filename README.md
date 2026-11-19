@@ -66,8 +66,10 @@ Locally:
     pip install -r requirements.txt
     py -3.13 web/app.py          # http://127.0.0.1:5000
 
-As a public website, the repo deploys to a Hugging Face Space (Docker,
-free CPU) with `bash deploy_space.sh`. Analyses run one at a time through a
+As a public website, the repo deploys to a free Hugging Face Space with
+`bash deploy_space.sh`. The Space uses the free Gradio-SDK hardware but runs
+this Flask site (`web/app.py`, served by waitress on port 7860); the
+`Dockerfile` is kept for hosts that run containers. Analyses run one at a time through a
 queue, so visitors see their place in line. Clips are limited to 12 seconds
 and six per upload. Uploaded videos are deleted once analysed, and reports
 are deleted an hour after they finish.

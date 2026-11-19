@@ -3,6 +3,11 @@
 #
 #   bash deploy_space.sh
 #
+# The Space uses the free Gradio SDK hardware, but runs our own Flask site:
+# app_file points at web/app.py, which serves on port 7860 when it sees it is
+# on a Space. packages.txt supplies the system libraries OpenCV and MediaPipe
+# need. (The Dockerfile is kept for any host that runs containers.)
+#
 # Hugging Face reads the Space's settings from a header at the top of
 # README.md, which the GitHub README should not show. So this builds a
 # throwaway commit on top of main with the header added and force-pushes it
@@ -31,8 +36,10 @@ title: Delivery Stride
 emoji: 🏏
 colorFrom: green
 colorTo: yellow
-sdk: docker
-app_port: 7860
+sdk: gradio
+sdk_version: "6.32.0"
+python_version: "3.13"
+app_file: web/app.py
 pinned: false
 short_description: Fast bowling technique from one side-on phone video
 ---
@@ -46,4 +53,4 @@ git push --force "$REMOTE" hf-deploy:main
 
 echo
 echo "Pushed. The Space rebuilds in 5-10 minutes:"
-echo "  https://huggingface.co/spaces/Tarak-Ram-1908/delivery-stride"
+echo "  $(git remote get-url "$REMOTE" | sed 's#\.git$##')"

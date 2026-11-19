@@ -295,6 +295,16 @@ if __name__ == "__main__":
     if not os.path.exists(MODEL):
         print("WARNING: models/phase_model.joblib not found.")
         print("Run:  py -3.13 train_production.py feat_noab_win.csv\n")
-    port = int(os.environ.get("PORT", 5000))
-    host = "0.0.0.0" if os.environ.get("PORT") else "127.0.0.1"
-    app.run(debug=False, host=host, port=port)
+    # On a Hugging Face Space (free Gradio-SDK hardware) the runtime simply
+    # runs this file and routes the public URL to port 7860; SPACE_ID tells us
+    # we are there. Serve with waitress, a production server, in that case.
+    on_space = bool(os.environ.get("SPACE_ID"))
+    port = int(os.environ.get("PORT", 7860 if on_space else 5000))
+    if on_space or os.environ.get("SERVE_PUBLIC"):
+        from waitress import serve
+        print(f"serving on 0.0.0.0:{port}", flush=True)
+        serve(app, host="0.0.0.0", port=port, threads=8,
+              max_request_body_size=app.config["MAX_CONTENT_LENGTH"])
+    else:
+        host = "0.0.0.0" if os.environ.get("PORT") else "127.0.0.1"
+        app.run(debug=False, host=host, port=port)

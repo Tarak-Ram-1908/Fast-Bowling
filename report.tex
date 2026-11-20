@@ -9,6 +9,7 @@
 \usepackage[hidelinks]{hyperref}
 \usepackage{float}
 \usepackage{enumitem}
+\usepackage{array}
 
 \graphicspath{{report/figures/}}
 
@@ -25,18 +26,18 @@ Fast Bowling from a Single Uncalibrated Camera}}
     CS24B1039 & Ponnangatti Bala Murugan \\
     CS24B1046 & Vallipalli Lokesh Kumar \\
     CS24B1069 & Bellala Parthasaradhi \\
-  \end{tabular} \\[8pt]
-  Indian Institute of Information Technology, \\
-  Design and Manufacturing, Kancheepuram
+  \end{tabular}
 }
 
-\date{\today}
+\date{\vspace{-1.5em}}
 
 \begin{document}
 \maketitle
+\vspace{2\baselineskip}
 
-\begin{abstract}
-\noindent
+\section{Abstract}
+\label{sec:abstract}
+
 Every biomechanical variable associated with fast-bowling injury and
 performance is defined at one of three instants: back foot contact, front foot
 contact, or ball release. Locating those instants normally requires a
@@ -66,52 +67,41 @@ We also report a result about evaluation itself: across seven models, the
 per-frame ranking and the event ranking disagree, and a bidirectional LSTM
 that leads per-frame accuracy by five points is the worst model tested at
 locating front foot contact.
-\end{abstract}
 
 \section{Introduction}
 
 Fast bowling imposes the highest injury burden of any action in cricket, and
 lumbar stress fractures in particular have been linked to measurable features
-of technique. Portus et al.~\cite{portus2004} found shoulder counter-rotation
-of $41 \pm 10^\circ$ in a lumbar stress fracture group against $19 \pm
-10^\circ$ in uninjured bowlers. Worthington~\cite{worthington2010} established
-reference kinematics for twenty elite professionals.
+of technique~\cite{portus2004}. Measuring that technique, however, has so far
+required a motion-capture laboratory (Section~\ref{sec:survey}). Such
+facilities are rare and expensive, so the overwhelming majority of developing
+fast bowlers receive no biomechanical feedback at all---their coaches work from
+the naked eye, which cannot resolve a knee angle at an instant lasting eight
+milliseconds.
 
-Both studies required a motion-capture laboratory. Such facilities are rare and
-expensive, so the overwhelming majority of developing fast bowlers receive no
-biomechanical feedback at all---their coaches work from the naked eye, which
-cannot resolve a knee angle at an instant lasting eight milliseconds.
+\subsection{The three instants}
 
-Markerless pose estimation from ordinary video is the obvious alternative, and
-it is maturing quickly. But a review of markerless capture~\cite{opencap2026}
-reports an RMSE of $17.61 \pm 7.72^\circ$ for OpenCap on cricket bowling
-specifically, using a multi-camera rig, and concludes that such systems perform
-\emph{most} accurately for sagittal-plane measurements. Cricket bowling is a
-hard case even for purpose-built markerless systems.
+The delivery stride is the final stride before the ball is bowled.
+\textbf{Back foot contact (BFC)} is the frame the back foot lands to begin it.
+\textbf{Front foot contact (FFC)} is the frame the front foot lands and braces
+against the ground. \textbf{Ball release} is the frame the ball leaves the
+hand. At 120\,fps the whole stride spans roughly thirty frames, so one frame of
+error is 8.3\,ms.
 
-\subsection{The gap}
+Every technique variable in the biomechanics literature is defined at one of
+these three instants, so finding them is the step on which every measurement
+depends.
 
-Two recent works approach this problem from different directions. A machine
-learning study of fast-bowling kinematics using MediaPipe requires the operator
-to \emph{enter the ball-release frame by hand}, and lists automatic detection as
-future work. A deep-learning system for illegal-action detection locates
-shoulder and release frames but never foot contact, and measures only elbow
-extension for legality rather than kinematics.
+\subsection{Objective}
 
-Meanwhile, the computer-vision literature has a well-developed subfield for
-exactly this problem. \emph{Precise event spotting}~\cite{pes2025} concerns
-frame-accurate detection of instantaneous events, as distinct from action
-spotting over intervals, and reports results at tolerances of one to five
-frames. Its surveyed datasets cover soccer, tennis, table tennis, basketball,
-badminton, figure skating, diving and gymnastics. Cricket appears in none of
-them.
+This project asks whether the three instants can be located automatically in
+ordinary video from a single uncalibrated phone camera, with no markers and no
+laboratory, and whether the kinematic variables measured at the detected
+instants agree with published elite reference values. It ends in a working
+tool: a website, Delivery Stride, that measures a bowler's delivery from one
+side-on clip (Section~\ref{sec:tool}).
 
-So the sport whose key measurements are \emph{defined} at three instants has
-not been addressed by the field that specialises in finding instants, and the
-one published phone-based system for fast-bowling kinematics asks a human to
-find the most important instant manually.
-
-\subsection{Contribution}
+\subsection{What this work adds}
 
 \begin{enumerate}
   \item A reformulation of instantaneous event detection as per-frame phase
@@ -130,43 +120,69 @@ find the most important instant manually.
         and why.
 \end{enumerate}
 
-\section{Background}
+\subsection{Organisation of the report}
 
-\subsection{The three instants}
+Section~\ref{sec:survey} surveys the related literature and identifies the
+gap. Section~\ref{sec:dataset} describes the dataset and its annotation,
+Section~\ref{sec:method} the methodology, and Section~\ref{sec:results} the
+experimental results and their limitations. Section~\ref{sec:conclusion}
+concludes, followed by the references and the contributions of each team
+member.
 
-The delivery stride is the final stride before the ball is bowled.
-\textbf{Back foot contact (BFC)} is the frame the back foot lands to begin it.
-\textbf{Front foot contact (FFC)} is the frame the front foot lands and braces
-against the ground. \textbf{Ball release} is the frame the ball leaves the
-hand. At 120\,fps the whole stride spans roughly thirty frames, so one frame of
-error is 8.3\,ms.
+\section{Literature Survey}
+\label{sec:survey}
 
-\subsection{Events versus phases}
+\subsection{Fast-bowling biomechanics}
 
-An \emph{event} is an instant---a single frame. A \emph{phase} is an
-interval. This distinction determines the entire method. Training a classifier
-to recognise an event means one positive example per delivery against several
-hundred negatives, and the frame immediately before release is visually almost
-identical to release itself.
+Portus et al.~\cite{portus2004} found shoulder counter-rotation of $41 \pm
+10^\circ$ in a group of bowlers with lumbar stress fractures against $19 \pm
+10^\circ$ in uninjured bowlers, the strongest published association between
+technique and lower-back injury. Worthington~\cite{worthington2010}
+established reference kinematics for twenty elite professionals; his phase and
+variable definitions are the ones used throughout this report, and his values
+are the reference every measurement is compared with. Both studies required a
+motion-capture laboratory.
 
-Training on phases is a well-posed problem: each class has thousands of
-examples, and the classes are visually distinguishable. We therefore
-label every frame with the phase it belongs to, train on that, and read the
-events off the boundaries:
+\subsection{Markerless motion capture}
 
-\begin{itemize}
-  \item BFC $=$ the first frame of the predicted \texttt{bfc\_phase} block
-  \item FFC $=$ the first frame of the predicted \texttt{ffc\_phase} block
-  \item Release $=$ the last frame of the predicted \texttt{ffc\_phase} block
-\end{itemize}
+Markerless pose estimation from ordinary video is the obvious alternative, and
+it is maturing quickly. But a review of markerless capture~\cite{opencap2026}
+reports an RMSE of $17.61 \pm 7.72^\circ$ for OpenCap on cricket bowling
+specifically, using a multi-camera rig, and concludes that such systems perform
+\emph{most} accurately for sagittal-plane measurements. Cricket bowling is a
+hard case even for purpose-built markerless systems. Colyer et
+al.~\cite{colyer2018} review the evolution of vision-based motion analysis
+towards markerless systems, and set out what a single two-dimensional view can
+and cannot recover---a constraint that returns in Section~\ref{sec:limits}.
 
-A second benefit follows. Because only the block \emph{edges} are read, the
-model may be wrong in the \emph{middle} of a block without affecting the
-extracted events. Per-frame accuracy therefore understates event accuracy, and
-the two are not interchangeable---a point Section~\ref{sec:disagree} develops
-into a result.
+\subsection{Fast-bowling analysis from a phone}
+
+Two recent works analyse fast bowling from ordinary video. A machine
+learning study of fast-bowling kinematics using MediaPipe requires the operator
+to \emph{enter the ball-release frame by hand}, and lists automatic detection as
+future work. A deep-learning system for illegal-action detection locates
+shoulder and release frames but never foot contact, and measures only elbow
+extension for legality rather than kinematics.
+
+\subsection{Precise event spotting}
+
+The computer-vision literature has a well-developed subfield for
+exactly this problem. \emph{Precise event spotting}~\cite{pes2025} concerns
+frame-accurate detection of instantaneous events, as distinct from action
+spotting over intervals, and reports results at tolerances of one to five
+frames. Its surveyed datasets cover soccer, tennis, table tennis, basketball,
+badminton, figure skating, diving and gymnastics. Cricket appears in none of
+them.
+
+\subsection{The gap}
+
+So the sport whose key measurements are \emph{defined} at three instants has
+not been addressed by the field that specialises in finding instants, and the
+one published phone-based system for fast-bowling kinematics asks a human to
+find the most important instant manually.
 
 \section{Dataset}
+\label{sec:dataset}
 
 Twenty-five fast bowlers were filmed over two sessions in September and October
 2026. Each was recorded side-on, perpendicular to the run-up, with a single
@@ -205,7 +221,33 @@ labelled frames. Figure~\ref{fig:balance} shows the distribution.
   \label{fig:balance}
 \end{figure}
 
-\section{Method}
+\section{Methodology}
+\label{sec:method}
+
+\subsection{Events versus phases}
+
+An \emph{event} is an instant---a single frame. A \emph{phase} is an
+interval. This distinction determines the entire method. Training a classifier
+to recognise an event means one positive example per delivery against several
+hundred negatives, and the frame immediately before release is visually almost
+identical to release itself.
+
+Training on phases is a well-posed problem: each class has thousands of
+examples, and the classes are visually distinguishable. We therefore
+label every frame with the phase it belongs to, train on that, and read the
+events off the boundaries:
+
+\begin{itemize}
+  \item BFC $=$ the first frame of the predicted \texttt{bfc\_phase} block
+  \item FFC $=$ the first frame of the predicted \texttt{ffc\_phase} block
+  \item Release $=$ the last frame of the predicted \texttt{ffc\_phase} block
+\end{itemize}
+
+A second benefit follows. Because only the block \emph{edges} are read, the
+model may be wrong in the \emph{middle} of a block without affecting the
+extracted events. Per-frame accuracy therefore understates event accuracy, and
+the two are not interchangeable---a point Section~\ref{sec:disagree} develops
+into a result.
 
 \subsection{Pose estimation}
 
@@ -305,7 +347,37 @@ Events are then read off the block edges.
 missing value. Rates reported below are shares of all 268 deliveries, so a
 model that declines the hard cases is not rewarded for it.
 
-\section{Results}
+\subsection{From measurements to a usable tool}
+\label{sec:tool}
+
+The pipeline is packaged as a website, Delivery Stride
+(\url{https://tarak-ram-1908.github.io/Fast-Bowling/}). A bowler uploads up
+to six side-on clips of at most twelve seconds each and receives the
+measurements for every delivery and their average, each compared with the
+elite reference. The whole analysis runs in the visitor's web browser: the
+same MediaPipe pose model, a JavaScript port of the features, random forest,
+event extraction and measurements, so the video never leaves the device and
+no server is needed.
+
+A single clip is a much weaker measurement than the cohort, mostly because
+back foot contact is right only 59\% of the time, so the report guards each
+delivery. The three event frames are shown with the detected skeleton and can
+be stepped forwards or backwards and re-measured. Every value is checked
+against our own 262 deliveries: past three cohort standard deviations it is
+reported as a probable detection error rather than a finding. Each
+measurement carries a confidence level inherited from the event frames it
+depends on, and every value more than one standard deviation from the elite
+mean is drawn on the frame it was measured at, beside where the elite average
+would put the same segments. Explanations quote the published association
+across bowlers and never prescribe a change.
+
+Fed the same pose landmarks, the browser port reproduces the Python pipeline
+exactly on six clips from five bowlers: every event, measurement, confidence
+level and warning. Run end to end in the browser on three clips, all nine
+detected events matched the Python version frame for frame.
+
+\section{Experimental Results}
+\label{sec:results}
 
 \subsection{Event detection}
 
@@ -634,7 +706,8 @@ Either club bowlers genuinely do not brace and extend as professionals do, or
 our measurement systematically compresses extension. We cannot distinguish them
 with the present data, and prefer to say so.
 
-\section{Limitations}
+\subsection{Limitations}
+\label{sec:limits}
 
 \paragraph{Ground truth is human annotation.} The reference marks were made by
 one annotator, who is also an author. Published inter-annotator limits of
@@ -674,6 +747,7 @@ to validate against. The sample is 25 club bowlers from one institute,
 with no injury outcomes.
 
 \section{Conclusion}
+\label{sec:conclusion}
 
 Back foot contact, front foot contact and ball release can be located
 automatically in fast-bowling video from a single uncalibrated side-on camera.
@@ -697,6 +771,9 @@ transverse-plane quantity that one camera geometrically cannot recover. We
 report it as unmeasurable rather than approximating it, because a confident
 wrong number about a young athlete's injury risk is worse than an honest gap.
 
+\refstepcounter{section}
+\renewcommand{\refname}{\arabic{section}\quad References}
+\addcontentsline{toc}{section}{References}
 \begin{thebibliography}{9}
 
 \bibitem{portus2004}
@@ -737,5 +814,28 @@ arXiv:2505.03991, 2025.
 \emph{Frontiers in Neuroscience}, 2022.
 
 \end{thebibliography}
+
+\section{Contributions}
+
+\noindent
+\begin{tabular}{@{}ll>{\raggedright\arraybackslash}p{7.2cm}@{}}
+  \toprule
+  Roll number & Name & Contribution \\
+  \midrule
+  CS24B1031 & Alahari Tarak Ram & Organised both recording sessions;
+    labelled the data, leading the frame-level annotation of 304
+    deliveries. \\[3pt]
+  CS24B1039 & Ponnangatti Bala Murugan & Designed the phase-reformulation
+    approach; implemented the feature normalisation and temporal window
+    stacking. \\[3pt]
+  CS24B1046 & Vallipalli Lokesh Kumar & Implemented the event extraction and
+    the kinematic measurement pipeline. \\[3pt]
+  CS24B1069 & Bellala Parthasaradhi & Built the web application; conducted
+    the literature review. \\
+  \bottomrule
+\end{tabular}
+
+\medskip
+\noindent All authors contributed to the analysis and to writing the report.
 
 \end{document}

@@ -104,9 +104,7 @@ through WebGL where available, otherwise on the CPU) and longer on a phone.
 
 Analyses run one at a time through a queue, so visitors see their place in
 line. Clips are limited to 12 seconds and six per upload. Uploaded videos are
-deleted once analysed, and reports an hour after they finish. The
-`Dockerfile` runs it on any container host, and `deploy_space.sh` publishes it
-to a Hugging Face Space, though CPU Spaces now need a paid account.
+deleted once analysed, and reports an hour after they finish.
 
 ## What it does not do
 

@@ -1,0 +1,15 @@
+\begin{table}[htbp]
+  \centering
+  \caption{Event detection accuracy (forest), leave-one-bowler-out. Rates are out of all 268 deliveries; 'Detected' is how many yielded a phase block at all. 'Error' is the mean absolute timing error, in frames and in milliseconds, over the deliveries detected.}
+  \label{tab:events}
+  \small
+  \begin{tabular}{lrrrrrr}
+    \toprule
+    Event & Detected & Error (fr) & Error (ms) & Within 1 & Within 3 & Within 5 \\
+    \midrule
+    Ball release & 268/268 & 0.76 & 6.3 & 86.6\% & 98.5\% & 99.6\% \\
+    Front-foot contact & 268/268 & 1.53 & 12.7 & 59.3\% & 91.8\% & 98.9\% \\
+    Back-foot contact & 267/268 & 3.54 & 29.5 & 25.7\% & 59.0\% & 78.7\% \\
+    \bottomrule
+  \end{tabular}
+\end{table}

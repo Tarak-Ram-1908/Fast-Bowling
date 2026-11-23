@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Delivery Stride</title>
+<meta name="description" content="Fast bowling technique from one side-on phone video, measured in your browser against elite reference values.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="site.css">
+</head><body>
+
+<header class="top"><div class="wrap">
+  <span class="mark">Delivery <b>Stride</b></span>
+</div></header>
+
+<section class="hero"><div class="wrap">
+  <h1>Where your pace<br>is going</h1>
+  <p class="lede">Elite fast bowling has been measured in laboratories for
+    decades, with eighteen cameras and markers taped to the body. Film one
+    delivery from the side on a phone and this returns twelve measurements,
+    eight of them set against the elite reference values.</p>
+  <p class="lede private">Everything runs in your browser. Your video never
+    leaves your device.</p>
+</div></section>
+
+<section class="shoot"><div class="wrap">
+  <h2>Filming the delivery</h2>
+  <p>The measurement is only as good as the angle you shoot from. Five things
+     matter; the rest does not.</p>
+  <ul class="checks">
+    <li><b>Stand square to the bowler</b><span>Side on, level with the crease,
+      about 8–10 m away. Not behind, not at an angle.</span></li>
+    <li><b>Both feet and the head in frame</b><span>Through the whole delivery
+      stride. If the feet leave the frame the stride cannot be measured.</span></li>
+    <li><b>120 frames per second</b><span>Slow-motion mode on any recent phone.
+      At 30 fps the foot contacts fall between frames.</span></li>
+    <li><b>Hold the phone still</b><span>Brace it or use a tripod. Panning
+      moves the background the model uses for scale.</span></li>
+    <li><b>One delivery per clip</b><span>From run-up to follow-through. Three
+      to five seconds is plenty.</span></li>
+    <li><b>Send six, not one</b><span>Choose several deliveries together and the
+      report leads with their average. A single clip carries event-detection
+      noise that largely cancels over six.</span></li>
+  </ul>
+</div></section>
+
+<section class="upload" id="analyse"><div class="wrap">
+  <h2>Analyse your deliveries</h2>
+  <p>One clip works. Several clips of the same bowler work better: the report
+     averages them and leaves out any value that looks like a detection error.</p>
+  <form id="f" class="drop">
+    <input type="file" name="video" id="video" multiple accept="video/mp4,video/quicktime,.mp4,.mov,.m4v">
+    <button type="submit" id="go" disabled>Measure it</button>
+  </form>
+  <p class="privacy">Up to 6 clips of up to 12 seconds each. The analysis runs
+     on this device, so a laptop takes roughly half a minute per clip and an
+     older phone longer. The models (about 50 MB) download on your first visit.
+     <span id="loadstate"></span></p>
+  <div class="bar" id="bar"><i id="fill"></i></div>
+  <p class="stage" id="stage"></p>
+  <p class="err" id="err"></p>
+</div></section>
+
+<div id="reportwrap" hidden>
+  <div id="report"></div>
+
+<!-- DEFS:START (filled from web/templates/report.html by export_web.py) -->
+<section class="defs"><div class="wrap">
+  <h2 style="margin-top:40px">What each measurement means</h2>
+  <dl>
+
+  <div class="def"><dt>Front knee at foot contact<small>Hip–knee–ankle, the frame the front foot lands</small></dt><dd>
+    <p>How straight the front leg is at the instant it hits the ground. 180° is
+       dead straight; a knee pushed past straight reads above 180°, as in the
+       laboratory data. This is the position everything that follows is braced
+       from — the leg either holds this shape or folds.</p>
+    <p>Elite bowlers average <span class="ref">164.1°</span>, so slightly bent,
+       not locked. A very straight leg at contact is not the goal in itself;
+       what matters is what happens to it over the next 150 milliseconds.</p>
+  </dd></div>
+
+  <div class="def"><dt>Front knee at release<small>The same angle when the ball leaves the hand</small></dt><dd>
+    <p>The single most useful number here. Front knee angle at release is one of
+       four technique parameters that together explain <span class="ref">73.6%</span>
+       of the variation in release speed across Worthington's elite cohort.</p>
+    <p>A straighter leg at release means the braced front leg is still acting as
+       a rigid lever, converting your run-up into rotation over the top. A bent
+       one means the leg absorbed that energy instead of passing it on. Elite
+       average <span class="ref">167.3°</span>. That is an association across
+       elite bowlers; it does not say that changing your knee angle would
+       change your pace.</p>
+  </dd></div>
+
+  <div class="def"><dt>Knee flexion after contact<small>How far the knee bends from contact to its lowest point</small></dt><dd>
+    <p>The amount the front leg collapses under the landing load, measured
+       here from the instant the foot lands to the knee's most bent point.</p>
+    <p>Some flexion is unavoidable and useful — it absorbs a landing force of
+       around six times body weight.</p>
+    <p>Worthington's elite figure of 17.5° is measured from <em>front foot
+       flat</em> — when the whole foot is down, a few frames after it lands —
+       which this system does not detect. Measuring from landing reads several
+       degrees higher, so the number is not compared with his.</p>
+  </dd></div>
+
+  <div class="def"><dt>Knee extension before release<small>How far it straightens again, from the lowest point to release</small></dt><dd>
+    <p>The drive. After absorbing the landing, the elite bowler pushes the knee
+       back out by <span class="ref">11.9°</span> before letting go.</p>
+    <p>This is the measurement that most sharply separates skill levels. Across
+       the bowlers measured in this study the average was under 4° — the leg
+       bends and simply stays bent. Portus classifies bowlers by exactly this
+       behaviour: flex and recover is a <em>flexor-extender</em>, flex and stay
+       bent is a <em>flexor</em>.</p>
+  </dd></div>
+
+  <div class="def"><dt>Plant angle<small>The front leg against vertical, hip to ankle, at foot contact</small></dt><dd>
+    <p>How far in front of the hips the front foot lands. A bigger angle means
+       the foot is planted further ahead, which brakes the body harder.</p>
+    <p>Worthington found that braking impulse, not peak force, is what
+       characterises the fastest bowlers (<span class="ref">r = 0.574</span>),
+       and that they generate it through a larger plant angle. Elite average
+       <span class="ref">36.3°</span>. This is the measurement this system
+       reproduces most closely against laboratory values.</p>
+  </dd></div>
+
+  <div class="def"><dt>Foot strike angle<small>The front foot against horizontal as it lands</small></dt><dd>
+    <p>Whether the front foot lands heel first, flat, or toe first. Negative
+       values mean the toe is down.</p>
+    <p>Elite bowlers average <span class="ref">−8.2°</span>, landing slightly
+       toe down, with a wide spread of ±13.2 — this varies more between
+       individuals than most measurements. Note that every bowler in the
+       reference study wore spiked cricket shoes on an indoor surface, so
+       footwear and ground will shift this.</p>
+  </dd></div>
+
+  <div class="def"><dt>Trunk lean at back foot contact<small>The upper body against vertical, back foot landing</small></dt><dd>
+    <p>How far the bowler is leaning back away from the batsman as the back foot
+       lands. Leaning back here lengthens the path over which the arm can
+       accelerate.</p>
+    <p>Elite average <span class="ref">9.0°</span>. This is the least reliable
+       number in the report: back foot contact is detected within three frames
+       on about 60% of deliveries, against 91% for front foot contact, so it is
+       marked low confidence until you check the back foot contact frame.</p>
+  </dd></div>
+
+  <div class="def"><dt>Trunk lean at front foot contact<small>The upper body against vertical, front foot landing</small></dt><dd>
+    <p>Where the upper body has rotated to by the time the front foot plants.
+       Reported here because the <em>change</em> in trunk lean between this
+       instant and release is the quantity that matters.</p>
+    <p>Worthington does not publish a reference value for the instantaneous
+       angle, so there is nothing to compare against — only your own number,
+       useful for tracking changes over time.</p>
+  </dd></div>
+
+  <div class="def"><dt>Trunk lean at release<small>The upper body against vertical when the ball leaves</small></dt><dd>
+    <p>Upper trunk flexion from front foot contact to release is the third of
+       Worthington's four speed parameters. The bowler who flexes the trunk
+       further over the braced front leg releases faster.</p>
+    <p>Subtract the previous row from this one to get that flexion. No published
+       reference exists for the standalone angle at release.</p>
+  </dd></div>
+
+  <div class="def"><dt>Bowling arm against the trunk<small>The upper arm, shoulder to elbow, relative to the line of the trunk at release</small></dt><dd>
+    <p>Where the arm is when the ball goes, measured against the trunk rather
+       than against vertical.</p>
+    <p>Worthington found something counter-intuitive: his fastest bowlers had
+       the arm further <em>behind</em> the line of the trunk at release, not
+       further in front as earlier studies had reported. He attributes the
+       disagreement to those studies measuring against the vertical instead.
+       His angle is a three-dimensional shoulder angle with a different zero,
+       so this upper-arm-against-trunk angle is reported unanchored.</p>
+  </dd></div>
+
+  <div class="def"><dt>Delivery stride<small>Ankle to ankle at front foot contact, as a percentage of standing height</small></dt><dd>
+    <p>The length of the final stride: the distance between the two ankles at
+       the instant the front foot lands, which is how Worthington measures it,
+       scaled by height so tall and short bowlers can be compared.</p>
+    <p>Elite average <span class="ref">78.5%</span> of standing height. A longer
+       stride lowers the hips, lengthens the braking phase and generally goes
+       with a larger plant angle. Here it is converted from torso lengths using
+       an anthropometric constant rather than from a measured height, so read it
+       as approximate.</p>
+  </dd></div>
+
+  <div class="def"><dt>Release height<small>Wrist above the ground at release, as a percentage of standing height</small></dt><dd>
+    <p>How high the ball is let go. Higher release means steeper bounce off the
+       pitch, which is why tall fast bowlers are awkward to face.</p>
+    <p>Elite average <span class="ref">112.8%</span> of standing height — above
+       the bowler's own head, because the arm is extended overhead. Measured
+       here as wrist above the lower ankle, so it reads roughly 10 cm low: the
+       ball sits beyond the wrist, and the ankle stands in for ground level.</p>
+  </dd></div>
+
+  </dl>
+</div></section>
+<!-- DEFS:END -->
+
+  <section class="scope"><div class="wrap">
+    <h3>How far to trust this</h3>
+    <p>Front foot contact lands within three frames of a hand mark on 91.8% of
+       deliveries and release on 98.5%. Back foot contact manages 59.0%, so
+       trunk lean at back foot contact, the one value measured there, starts at
+       low confidence until you check its frame. MediaPipe's own joint-angle
+       accuracy has not been validated for fast bowling, so even a correctly
+       timed angle carries several degrees of error.</p>
+    <p>Every value is also compared with our own cohort of 262 deliveries from 23
+       club bowlers. A value more than three standard deviations outside it is
+       treated as a probable detection error and not compared with the elite
+       reference until the frames are checked. At cohort level the measurements
+       are validated; for a single delivery they are much weaker, which is why
+       averaging several deliveries helps.</p>
+    <p><strong>Nothing here is a coaching prescription.</strong> The explanations
+       report published associations across groups of bowlers. They do not
+       predict what would happen if you changed your action.</p>
+    <p><strong>Legality is not assessed.</strong> Whether the elbow extends past
+       the permitted 15° cannot be judged from a single side-on view. The elite
+       reference values describe legal actions.</p>
+    <p>Shoulder counter-rotation — the strongest published link between bowling
+       technique and lower-back injury — is a transverse-plane measurement and
+       needs a second camera behind the bowler. Nothing here speaks to injury
+       risk.</p>
+    <p>The report exists only in this browser tab. Save anything you want to
+       keep before closing it.</p>
+    <button type="button" class="again" id="again">Measure more deliveries</button>
+  </div></section>
+</div>
+
+<footer class="foot"><div class="wrap">
+  <p>A data science course project at IIITDM Kancheepuram.
+     <a href="https://github.com/Tarak-Ram-1908/Fast-Bowling">Source and report</a>.</p>
+</div></footer>
+
+<script type="module" src="js/app.js"></script>
+</body></html>

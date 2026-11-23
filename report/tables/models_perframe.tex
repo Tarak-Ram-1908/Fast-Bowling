@@ -1,0 +1,18 @@
+\begin{table}[htbp]
+  \centering
+  \caption{Per-frame phase classification, leave-one-bowler-out.}
+  \label{tab:models_perframe}
+  \begin{tabular}{lrr}
+    \toprule
+    Model & Accuracy & Macro F1 \\
+    \midrule
+    bilstm & 0.915 & 0.909 \\
+    extratrees & 0.847 & 0.827 \\
+    forest & 0.852 & 0.831 \\
+    hgb & 0.863 & 0.844 \\
+    logreg & 0.816 & 0.806 \\
+    mlp & 0.843 & 0.822 \\
+    tcn & 0.833 & 0.820 \\
+    \bottomrule
+  \end{tabular}
+\end{table}

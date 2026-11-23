@@ -1,0 +1,14 @@
+\begin{table}[htbp]
+  \centering
+  \caption{Event detection within 3 frames, by model, as a share of all deliveries (clips where no block was found count as failures).}
+  \label{tab:models_events}
+  \begin{tabular}{lrrrrrrr}
+    \toprule
+    Event & bilstm & extratrees & forest & hgb & logreg & mlp & tcn \\
+    \midrule
+    Ball release & 97.4\% & 98.5\% & 98.5\% & 98.5\% & 88.1\% & 96.3\% & 88.4\% \\
+    Front-foot contact & 72.8\% & 84.7\% & 91.8\% & 91.0\% & 80.6\% & 83.2\% & 82.1\% \\
+    Back-foot contact & 79.9\% & 58.2\% & 59.0\% & 59.0\% & 53.4\% & 59.0\% & 49.6\% \\
+    \bottomrule
+  \end{tabular}
+\end{table}

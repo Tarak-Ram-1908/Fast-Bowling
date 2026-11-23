@@ -1,0 +1,66 @@
+{
+  "source": "measurements.csv",
+  "bowlers": 23,
+  "stats": {
+    "front_knee_ffc": {
+      "mean": 169.121,
+      "sd": 10.108,
+      "n": 262
+    },
+    "front_knee_release": {
+      "mean": 144.091,
+      "sd": 18.97,
+      "n": 262
+    },
+    "knee_flexion": {
+      "mean": 28.342,
+      "sd": 15.059,
+      "n": 262
+    },
+    "knee_extension": {
+      "mean": 3.311,
+      "sd": 5.417,
+      "n": 262
+    },
+    "plant_angle": {
+      "mean": 36.556,
+      "sd": 4.59,
+      "n": 262
+    },
+    "foot_strike": {
+      "mean": 7.112,
+      "sd": 13.381,
+      "n": 262
+    },
+    "lean_back_bfc": {
+      "mean": 3.433,
+      "sd": 5.688,
+      "n": 261
+    },
+    "trunk_lean_ffc": {
+      "mean": 7.785,
+      "sd": 6.58,
+      "n": 262
+    },
+    "trunk_lean_release": {
+      "mean": 30.359,
+      "sd": 9.169,
+      "n": 262
+    },
+    "arm_angle_release": {
+      "mean": -13.745,
+      "sd": 13.924,
+      "n": 262
+    },
+    "stride_pct_height": {
+      "mean": 56.245,
+      "sd": 5.471,
+      "n": 262
+    },
+    "release_pct_height": {
+      "mean": 108.398,
+      "sd": 10.178,
+      "n": 262
+    }
+  }
+}
